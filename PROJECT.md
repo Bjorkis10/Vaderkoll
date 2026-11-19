@@ -6,12 +6,14 @@ markerar var källorna är överens/oense och ger grön/gul/röd poäng för akt
 Cykling, Grillning, egna lägen). Standardplats: **Ljungbyhed GK** (ungefärlig position 56.078, 13.230 – justera vid behov).
 
 ## Funktioner
-- Platssökning (Open-Meteo geocoding, bara Sverige), koordinater (`56.08, 13.23`) och sparade favoriter.
-- Tre källor sida vid sida: temp, nederbörd (mm/h), vind + byvind (m/s), molnighet (%).
-- Enighet: orange ram + etikett när källorna är oense om regn (`regn 1/3`), temp (≥3 °C spridning) eller vind (≥3 m/s).
+- Platssökning (Open-Meteo geocoding, bara Sverige), koordinater (`56.08, 13.23`), webbläsarens platstjänst (`📍 Min plats`) och sparade favoriter.
+- Tre källor sida vid sida: temp, nederbörd (mm/h), vind + byvind (m/s) + vindriktning (N..NV), molnighet (%).
+- Enighet: orange ram + etikett när källorna är oense om nederbörd (`regn 1/3`, `snö 2/3`, `snöbl. 2/3`), temp (≥3 °C spridning), vind (≥3 m/s) eller moln (≥50 %).
 - Aktivitetslägen med justerbara gränsvärden (temp min/max, regn, vind, byvind, moln, gul marginal %); egna lägen kan skapas/tas bort.
   Läge "Ingen" = rå prognos.
 - Tidsfilter (standard 07–19) och "bästa fönster" per dag (längsta gröna, annars gröna/gula, minst N timmar).
+- Förklaring av nekade timmar (`kallt`, `nederbörd`, `snö`, `vind`, `byvind`, `moln`) både i tabellens *Samlat*-kolumn, som tooltip på scorekortets timrutor och som sammanfattning med snabbförslag (t.ex. *Prova Vintergolf →* eller kortare fönster) när inget fönster hittas.
+- Inline-SVG dagsgraf (`dayChartHtml`) som visar källornas temperaturkurvor (SMHI heldragen, Yr streckad, DMI prickad), spridningsband, aktivitetsgräns och nederbördsstaplar.
 - Cache 30 min i localStorage; vid fel visas gammal cache (status `stale`). Källa som är nere kraschar inte appen.
 - Allt sparas i localStorage: plats, favoriter, läge, gränser, tidsfilter.
 
@@ -59,7 +61,7 @@ nederbörd fördelas jämnt över intervallet, `coarse:true` visas kursivt i UI.
 - Tidszon är fast Europe/Stockholm; sommartid hanteras av `Intl`.
 - Stickprov mot källornas egna webbsidor (yr.no, smhi.se) gjordes inte visuellt – jämförelsen gjordes mot källornas rå-API-svar.
 - Ingen automatisk uppdatering i bakgrunden; tryck "Uppdatera" (cachen är 30 min).
-- Idéer: byvind-tröskel i golfläget, vindriktning, UV, PWA/offline, graf per dag.
+- Idéer: byvind-tröskel i golfläget, UV, PWA/offline.
 - Väder-vyn är testad i Node (mockade källor) och i Chrome via Playwright med mockade svar och fast klocka, inte mot live-API i en riktig användarwebbläsare. Skärmläsare/tangentbord är kodat (aria-pressed, tablist, fokusåterställning) men inte provat med skärmläsare.
 
 
@@ -104,7 +106,7 @@ standard `plan` för befintliga användare). Plats, favoriter, vald dag, aktivit
 - Allt är prognoser. Appen visar inga observationer och hävdar inget om banans tillgänglighet eller skick.
 
 ### Medvetet utelämnat (finns inte i det normaliserade datat)
-Vindriktning, luftfuktighet, UV och sikt. De skulle kräva ändringar i alla tre adaptrar (`SOURCES`) och DMI-parametrar. Lägg till i `entries` först, sedan i kort.
+Luftfuktighet, UV och sikt. De skulle kräva ändringar i alla tre adaptrar (`SOURCES`) och DMI-parametrar. Lägg till i `entries` först, sedan i kort.
 
 ## Väderbilder i Väder-vyn (visuell tillståndslogik)
 Inline-SVG (inga bilder, ikonbibliotek eller emoji). Rör aldrig Planera (poäng, lägen, tröskelvärden, bästa fönster).
@@ -124,3 +126,9 @@ Inline-SVG (inga bilder, ikonbibliotek eller emoji). Rör aldrig Planera (poäng
 **Animation:** bara `transform`/`opacity` på få element (molndrift, solglöd, droppar, flingor, stjärnor). `prefers-reduced-motion` stänger av alla (full statisk bild); `#viewWeather[hidden]` pausar.
 **Verifierat (Playwright mot lokala mockade fixturer, inget kvar i appen):** alla lägen dag/natt på dator och mobil, 320 px utan sidledsscroll, reduced-motion, unika id, inga extra nätanrop vid byte av dag/timme, saknad data, Planera byte-identisk mot förra versionen.
 **Begränsningar:** inte testat med skärmläsare eller på riktiga enheter; molnformerna är stiliserade; snö/regn visas som statiska positioner med lätt rörelse, inte en simulering.
+
+
+### Vindriktning och geolokalisering (tillagt 2026-11-19)
+- Vindriktning (`dir`, grader varifrån vinden blåser): SMHI `wind_from_direction`, Yr `wind_from_direction`, DMI `wind-dir-10m`. Obs: DMI-parametern är **inte verifierad mot riktiga data**; saknas den visas ingen riktning från DMI. Interpoleras cirkulärt (`lerpDeg`) och medelvärdesbildas som vektorer (`meanDeg`).
+- `📍 Min plats` i platspanelen använder webbläsarens `navigator.geolocation` (inget lagras utöver vald plats, ingen nyckel). Nekas åtkomst visas ett förklarande meddelande.
+- Testat i Node/Chrome med mockad data; geolokalisering bara i nekat-läget.
