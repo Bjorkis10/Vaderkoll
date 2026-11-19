@@ -92,6 +92,8 @@ standard `plan` för befintliga användare). Plats, favoriter, vald dag, aktivit
   scrollbar timremsa (hela dygnet, ignorerar Planeras tidsfilter), veckolista med gemensam temperaturskala, kort (nederbörd, vind, molnighet, känns som, sol, källor)
   och utfällbar "Jämför väderkällor" (samma `detailTable()` som Planera, men utan aktivitetsfärger).
 
+**Texter och kontroller (förenklade 2026-11-19):** korten i Väder har korta rader; förklaringar ligger i den utfällbara "Om prognosen" (`state.aboutOpen`, sparas inte) och källjämförelsen i "Jämför väderkällor". Under temperaturen står t.ex. "Sammanvägd prognos · 3 källor", och för idag "Resten av dagen: högst …, lägst …". I Planera ligger tidsfilter, minsta fönster och gränsvärden bakom "Tider och gränsvärden" (`state.editOpen`) med sammanfattningen "07–19 · minst 3 h" bredvid. Röd rutfärg är mjukare men har kvar snedstrecken.
+
 ### Hur Väder räknar (se kommentaren ovanför `combine()` i koden)
 - Samlad timme = medelvärde över de källor som har ett värde just den timmen. Saknad källa lämnas utanför (aldrig 0). Gäller temp, nederbörd, vind, byvind, moln.
 - Dagens högsta/lägsta, nederbördssumma och högsta vind = `dayAvg()` (medel av källornas egna dagsvärden), här över hela dygnet. För idag gäller värdena återstående timmar.

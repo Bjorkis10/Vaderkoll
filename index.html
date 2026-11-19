@@ -59,7 +59,9 @@
   .filters{display:flex;flex-wrap:wrap;gap:14px;align-items:center;padding:10px 0;border-top:1px solid var(--rule);font-size:14px;color:var(--mute)}
   .filters label{display:flex;gap:6px;align-items:center}
   .filters select{padding:6px 8px}
-  .link{margin-left:auto;text-decoration:underline;text-underline-offset:3px;color:var(--ink)}
+  .link{text-decoration:underline;text-underline-offset:3px;color:var(--ink);font-weight:600}
+  .link .chev{font-size:12px}
+  .filters.tcl{border-top:0;padding-top:0}
 
   /* Scorekortet */
   .sc{background:var(--sheet);border:1px solid var(--ink);border-radius:2px;padding:6px 8px 8px}
@@ -75,7 +77,7 @@
   .h{display:block;height:28px;border-radius:2px;background:#dfe6df;position:relative;border-bottom:3px solid transparent}
   .h.s0{background:var(--good)}
   .h.s1{background:var(--ok) radial-gradient(circle,rgba(20,51,42,.55) 1.1px,transparent 1.4px) 0 0/6px 6px}   /* gul = prickar (inte bara färg) */
-  .h.s2{background:var(--bad) repeating-linear-gradient(135deg,transparent 0 4px,rgba(255,255,255,.38) 4px 6px)}
+  .h.s2{background:#d2594d repeating-linear-gradient(135deg,transparent 0 4px,rgba(255,255,255,.26) 4px 6px)}   /* mjukare röd, mönstret finns kvar */
   .h.na{background:transparent;box-shadow:inset 0 0 0 1px var(--rule)}
   .h.r0{background:#e3eae3}.h.r1{background:#bcd7e6}.h.r2{background:#6ea6c6}.h.r3{background:var(--sea)}
   .h.best{border-bottom-color:var(--ink)}
@@ -186,6 +188,26 @@
   details.cmp summary{cursor:pointer;font:600 18px/1.3 var(--serif)}
   details.cmp[open] summary{margin-bottom:8px}
   .badge.nb{background:#e6eee6;color:var(--ink)}
+  ul.ab{margin:6px 0 0;padding-left:20px;font-size:14px;color:var(--mute)}
+  ul.ab li{margin:4px 0}
+  .sunrow{display:grid;grid-template-columns:auto minmax(0,1fr) auto;gap:14px;align-items:center}
+  .sunrow svg{width:100%;max-width:240px;justify-self:center}
+  .sunrow .r{text-align:right}
+
+  /* Tätare: lägre sammanfattning, en rad mindre på mobil */
+  .sum{padding:14px 16px 14px}
+  .s-place{margin:0;font-size:21px}
+  .s-temp{font-size:clamp(64px,16vw,96px);margin:0}
+  .s-desc{font-size:19px}
+  .s-hl{margin:2px 0 0;font-size:15px}
+  .s-src{margin:6px auto 0;font-size:13.5px}
+  @media (max-width:700px){
+    .s-place{display:none}
+    .chip{padding:6px 12px;font-size:14px}
+    .acts{gap:6px;margin-bottom:6px}
+    .hero{padding:10px 0 12px}
+    .hbig{font-size:clamp(22px,6vw,28px)}
+  }
 </style>
 </head>
 <body>
@@ -214,11 +236,16 @@
   <section id="hero" class="hero" aria-live="polite"></section>
 
   <div class="filters">
-    <label>Visa kl <select id="from" aria-label="Från klockan"></select> till <select id="to" aria-label="Till klockan"></select></label>
-    <label>Minst <select id="minLen" aria-label="Minsta sammanhängande fönster"></select> i rad</label>
-    <button class="link" id="editBtn" data-a="toggleEdit" aria-expanded="false">Ändra gränsvärden</button>
+    <button class="link" id="editBtn" data-a="toggleEdit" aria-expanded="false" aria-controls="filtPanel">Tider och gränsvärden <span class="chev" aria-hidden="true">▾</span></button>
+    <span id="filtSum" class="small"></span>
   </div>
-  <div id="edit" class="edit" hidden></div>
+  <div id="filtPanel" hidden>
+    <div class="filters tcl">
+      <label>Visa kl <select id="from" aria-label="Från klockan"></select> till <select id="to" aria-label="Till klockan"></select></label>
+      <label>Minst <select id="minLen" aria-label="Minsta sammanhängande fönster"></select> i rad</label>
+    </div>
+    <div id="edit" class="edit"></div>
+  </div>
   <div id="days"></div>
 
   <h2 id="detailTitle"></h2>
@@ -488,7 +515,7 @@ const state = {
   modes: Object.assign(JSON.parse(JSON.stringify(PRESETS)), saved.modes || {}),
   from: saved.from ?? 7, to: saved.to ?? 19, minLen: saved.minLen ?? 3,
   view: saved.view === 'weather' ? 'weather' : 'plan',   // vald vy (sparas)
-  selDay: null, selHour: null, editOpen: false, placeOpen: false, animDone: false, cmpOpen: false, center: true, fk: null,
+  selDay: null, selHour: null, editOpen: false, placeOpen: false, animDone: false, cmpOpen: false, aboutOpen: false, center: true, fk: null,
   src: {},   // id -> {status, ts, msg, hours}
 };
 function save() { lsSet('sv1:settings', { loc: state.loc, favs: state.favs, act: state.act, modes: state.modes, from: state.from, to: state.to, minLen: state.minLen, view: state.view }); }
@@ -610,7 +637,8 @@ function renderPlan() {
   // Aktivitetsknappar + editor
   $('acts').innerHTML = Object.entries(state.modes).map(([id, m]) => `<button class="chip ${id === state.act ? 'on' : ''}" data-a="act" data-id="${id}" aria-pressed="${id === state.act}">${esc(m.name)}</button>`).join('') + `<button class="chip plus" data-a="newMode">+ Eget läge</button>`;
   $('editBtn').setAttribute('aria-expanded', state.editOpen);
-  $('edit').hidden = !state.editOpen;
+  $('filtPanel').hidden = !state.editOpen;
+  $('filtSum').textContent = `${pad(state.from)}–${pad(state.to)} · minst ${state.minLen} h`;
   if (state.editOpen && !$('edit').contains(document.activeElement)) renderEditor(mode);
 
   const days = buildDays();
@@ -634,9 +662,9 @@ function renderPlan() {
     $('hero').innerHTML = `<span class="flagbox s${w.level}">${FLAG}</span><div>
       <p class="hq">Bästa tiden för ${esc(mode.name.toLowerCase())} de närmaste dagarna</p>
       <p class="hbig">${esc(longDay(d.date))}, kl ${hhmm(w.from)}–${pad(endH)}</p>
-      <p class="hsub">${w.len} timmar i rad ${w.level === 0 ? 'som passar' : 'i gränsfall (gult): något utanför gränserna men fortfarande användbart'}. Villkor: ${esc(limitsText(lim))}.</p></div>`;
+      <p class="hsub">${w.len} h i rad ${w.level === 0 ? 'som passar' : 'i gränsfall (gult), fortfarande användbart'}.</p></div>`;
   } else {
-    $('hero').innerHTML = `<span class="flagbox s2">${FLAG}</span><div><p class="hbig">Inget bra fönster de närmaste dagarna</p><p class="hsub">Villkor: ${esc(limitsText(lim))}. Prova ett mildare gränsvärde eller ett längre tidsfönster.</p></div>`;
+    $('hero').innerHTML = `<span class="flagbox s2">${FLAG}</span><div><p class="hbig">Inget bra fönster de närmaste dagarna</p><p class="hsub">Prova mildare gränsvärden eller ett längre tidsfönster.</p></div>`;
   }
 
   // ----- Scorekortet: en rad per dag, en ruta per timme -----
@@ -680,7 +708,7 @@ function renderPlan() {
 }
 
 // Timtabell med alla källor (delas av Planera och Väder). scored = färga efter aktivitetens poäng (bara Planera).
-function detailTable(d, scored, selT) {
+function detailTable(d, scored, selT, note) {
   const head = `<tr><th class="t">Tid</th><th>${scored ? 'Samlat' : 'Enighet'}</th>${Object.keys(SOURCES).map((id) => `<th class="c">${SOURCES[id].name}</th>`).join('')}</tr>`;
   const LBL = ['passar', 'gränsfall (användbart)', 'passar inte'];
   const body = d.hours.map((r) => {
@@ -697,7 +725,7 @@ function detailTable(d, scored, selT) {
     const badges = r.agree.length ? r.agree.map((a) => `<span class="badge">${esc(a)}</span>`).join('') : (Object.values(r.s).filter(Boolean).length > 1 ? '<span class="badge ok">överens</span>' : '');
     return `<tr class="${r.t === selT ? 'selr' : ''}"><td class="t">${hhmm(r.t)}</td><td>${scored && r.c != null ? `<i class="h s${r.c} mini"></i><span class="vh">${LBL[r.c]}. </span>` : ''}${badges}</td>${cells}</tr>`;
   }).join('');
-  return `<table>${head}${body}</table><p class="note">Varje källa visar temperatur, nederbörd, vind (byvind) och moln. ❄ betyder att källan själv anger snö. Orange ram betyder att källorna är oense om nederbörd. Kursiv text är interpolerad från grövre tidssteg.</p>`;
+  return `<table>${head}${body}</table><p class="note">${note ? esc(note) : 'Varje källa visar temperatur, nederbörd, vind (byvind) och moln. ❄ betyder att källan själv anger snö. Orange ram betyder att källorna är oense om nederbörd. Kursiv text är interpolerad från grövre tidssteg.'}</p>`;
 }
 
 function renderEditor(mode) {
@@ -707,6 +735,7 @@ function renderEditor(mode) {
     <div class="grid">${FIELDS.map(([k, lbl]) => `<label>${lbl}<input type="number" step="any" data-l="${k}" value="${mode.limits[k] ?? ''}" placeholder="ingen"></label>`).join('')}
       <label>Gul marginal %<input type="number" step="1" min="0" data-l="tol" value="${mode.limits.tol ?? 25}"></label></div>
     <div class="row">${custom ? '<button class="btn" data-a="delMode">Ta bort läge</button>' : (PRESETS[id] && id !== 'none' ? '<button class="btn" data-a="resetMode">Återställ standard</button>' : '')}</div>
+    <p class="note">Nu: ${esc(limitsText(mode.limits) || 'inga gränser')}.</p>
     <p class="note">Tomt fält betyder ingen gräns. Grönt är inom gränsen, gult är lite utanför men fortfarande användbart (marginalen) och rött är klart utanför.</p>`;
 }
 
@@ -727,7 +756,7 @@ function renderEditor(mode) {
    - Känns som = vindkyla (kanadensiska formeln), bara vid ≤ 10 °C och ≥ 1,3 m/s medelvind.
    ===================================================================== */
 const mean = (a) => { const v = a.filter((x) => x != null); return v.length ? v.reduce((p, q) => p + q, 0) / v.length : null; };
-const deg = (v) => v == null ? '–' : Math.round(v) + '°';
+const deg = (v) => v == null ? '–' : String(Math.round(v)).replace('-', '−') + '°';
 
 // En samlad timme av de källor som har data (null om ingen källa har det)
 function combine(r) {
@@ -838,6 +867,12 @@ function srcLine(c) { // vilka källor som ligger bakom värdena
   return s + ' Alla värden är prognoser, inga mätningar.';
 }
 
+// Kort källrad under temperaturen
+function srcShort(c) {
+  const all = Object.keys(SOURCES).length, n = c.ids.length;
+  return n > 1 ? `Sammanvägd prognos · ${n === all ? n + ' källor' : n + ' av ' + all + ' källor'}` : `Prognos från ${SOURCES[c.ids[0]].name}`;
+}
+
 function renderWeather() {
   const el = $('viewWeather');
   const days = buildDays(0, 24);                        // hela dygnet, oberoende av Planeras tidsfilter
@@ -855,28 +890,28 @@ function renderWeather() {
   const tone = night ? 'night' : desc ? ({ rain: 'rain', sleet: 'rain', snow: 'snow', cloud: 'cloud' }[desc.key] || 'clear') : 'clear';
   const stale = Object.keys(SOURCES).filter((id) => (state.src[id] || {}).status === 'stale').map((id) => SOURCES[id].name);
 
-  // ----- Sammanfattning -----
+  // ----- Sammanfattning (kort: detaljerna ligger under "Om prognosen") -----
+  const partialToday = isToday && day.hours[0] && localParts(day.hours[0].t).hour > 0;
+  const staleTxt = stale.length ? ` Obs: gammal data från ${esc(stale.join(' och '))}.` : '';
   const sum = `<section class="sum" data-tone="${tone}" aria-label="Sammanfattning">
     <p class="s-when">Prognos: ${esc(longDay(day.date))}, kl ${pad(hr)}–${pad((hr + 1) % 24)}</p>
     <p class="s-place">${esc(state.loc.name)}</p>
     <p class="s-temp" aria-label="${c.temp == null ? 'temperatur saknas' : 'prognos ' + Math.round(c.temp) + ' grader'}">${deg(c.temp)}</p>
-    ${desc ? `<div class="s-desc">${wIcon(desc.key, night, 34)}<span>${desc.label}</span></div>` : ''}
-    ${a ? `<p class="s-hl">Högst ${deg(a.tmax)}, lägst ${deg(a.tmin)}</p>` : ''}
-    <p class="s-src">${esc(srcLine(c))}${isToday && day.hours[0] && localParts(day.hours[0].t).hour > 0 ? ' Dagens högsta och lägsta gäller återstående timmar.' : ''}${stale.length ? ` Obs: ${esc(stale.join(' och '))} visar gammal data.` : ''}</p>
+    ${desc ? `<div class="s-desc">${wIcon(desc.key, night, 30)}<span>${desc.label}</span></div>` : ''}
+    ${a ? `<p class="s-hl">${partialToday ? 'Resten av dagen: h' : 'H'}ögst ${deg(a.tmax)}, lägst ${deg(a.tmin)}</p>` : ''}
+    <p class="s-src">${esc(srcShort(c))}${staleTxt}</p>
   </section>`;
 
   // ----- Timprognos -----
-  let anyCoarse = false;
   const strip = day.hours.map((r) => {
     const cc = combine(r), nt = isNight(r.t), dd = describe(cc, nt), h = localParts(r.t).hour;
     const pr = cc.precip != null && cc.precip >= 0.1 ? f1(cc.precip) : '';
-    if (cc.coarse) anyCoarse = true;
     const lbl = `kl ${pad(h)}, ${cc.temp == null ? 'temperatur saknas' : Math.round(cc.temp) + ' grader'}${dd ? ', ' + dd.label.toLowerCase() : ''}${pr ? ', nederbörd ' + pr + ' mm' : ''}`;
     return `<button class="hi${cc.coarse ? ' ip' : ''}" data-a="hour" data-t="${r.t}" data-fk="wh${r.t}" aria-pressed="${r.t === cur.t}" aria-label="${esc(lbl)}"><span class="tm">${pad(h)}</span>${dd ? wIcon(dd.key, nt, 30) : '<span class="ic0"></span>'}<span class="tp">${deg(cc.temp)}</span><span class="pr">${pr}</span></button>`;
   }).join('');
   const hourly = `<section class="wc" aria-labelledby="hh"><h3 id="hh">Timprognos, ${esc(longDay(day.date).toLowerCase())}</h3>
     <div class="hs" id="hstrip" role="group" aria-label="Välj timme">${strip}</div>
-    <p class="sub">Siffran under temperaturen är nederbörd i mm för timmen.${anyCoarse ? ' Kursiv temperatur är interpolerad från grövre tidssteg.' : ''}</p></section>`;
+    <p class="sub">Nederbörd (mm) visas när den väntas.</p></section>`;
 
   // ----- Veckan: delad temperaturskala över alla visade dagar -----
   const sums = days.map((d) => ({ d, a: dayAvg(d) }));
@@ -895,34 +930,33 @@ function renderWeather() {
       <span class="rg"><span class="lo">${da ? deg(da.tmin) : '–'}</span><span class="trk">${da ? `<i style="left:${left.toFixed(1)}%;width:${wdt.toFixed(1)}%;background:linear-gradient(90deg,${tempColor(da.tmin)},${tempColor(da.tmax)})"></i>` : ''}</span><span class="hg">${da ? deg(da.tmax) : '–'}</span></span>
       <span class="pp">${esc(rainTxt)}</span></button>`;
   }).join('');
-  const week = `<section class="wc" aria-labelledby="wkh"><h3 id="wkh">Kommande dagar</h3><div role="group" aria-label="Välj dag">${wk}</div>
-    <p class="sub">Alla staplar har samma skala (${deg(gmin)} till ${deg(gmax)}). Siffrorna är medel av källornas egna högsta och lägsta. Nederbörden är dygnssumma i mm.</p></section>`;
+  const week = `<section class="wc" aria-labelledby="wkh"><h3 id="wkh">Kommande dagar</h3><div role="group" aria-label="Välj dag">${wk}</div></section>`;
 
-  // ----- Kort för vald timme -----
+  // ----- Kort för vald timme (korta texter, förklaringar finns under "Om prognosen") -----
   const later = day.hours.filter((r) => r.t > cur.t).map((r) => ({ r, c: combine(r) }));
   const wetNow = c.precip != null && c.precip >= 0.1;
   let when2 = '';
   if (c.precip != null) {
-    if (wetNow) { const stop = later.find((x) => x.c.precip != null && x.c.precip < 0.1); when2 = stop ? `Uppehåll väntas från kl ${hhmm(stop.r.t)}.` : 'Nederbörden väntas hålla i sig resten av dagen.'; }
-    else { const nx = later.find((x) => x.c.precip != null && x.c.precip >= 0.1); when2 = nx ? `Nästa nederbörd väntas kl ${hhmm(nx.r.t)}.` : 'Ingen mer nederbörd väntas resten av dagen.'; }
+    if (wetNow) { const stop = later.find((x) => x.c.precip != null && x.c.precip < 0.1); when2 = stop ? `Uppehåll från kl ${hhmm(stop.r.t)}.` : 'Håller i sig resten av dagen.'; }
+    else { const nx = later.find((x) => x.c.precip != null && x.c.precip >= 0.1); when2 = nx ? `Nästa nederbörd kl ${hhmm(nx.r.t)}.` : 'Inget mer nederbörd i dag.'; }
   }
   const kind = desc && ['rain', 'snow', 'sleet'].includes(desc.key) ? desc.label : (c.precip == null ? '' : 'Uppehåll');
   const cardPrecip = `<section class="wc" aria-labelledby="cp"><h3 id="cp">Nederbörd</h3>
-    <p class="big">${c.precip == null ? '–' : f1(c.precip)} <small>mm under timmen kl ${pad(hr)}–${pad((hr + 1) % 24)}</small></p>
+    <p class="big">${c.precip == null ? '–' : f1(c.precip)} <small>mm, kl ${pad(hr)}–${pad((hr + 1) % 24)}</small></p>
     <p class="sub">${esc(kind)}${kind && when2 ? '. ' : ''}${esc(when2)}</p>
-    <p class="sub">${a && a.rain != null ? `${isToday ? 'Resten av dagen' : 'Hela dygnet'}: ${f1(a.rain)} mm (medel av källornas summor).` : 'Dygnssumma saknas.'}</p></section>`;
+    <p class="sub">${a && a.rain != null ? `${isToday ? 'Resten av dagen' : 'Hela dygnet'}: ${f1(a.rain)} mm` : ''}</p></section>`;
   const cardWind = `<section class="wc" aria-labelledby="cw"><h3 id="cw">Vind</h3>
     <p class="big">${f1(c.wind)} <small>m/s medelvind</small></p>
-    <p class="sub">${c.gust == null ? 'Byvind saknas.' : `Byvindar upp till ${f1(c.gust)} m/s.`} ${esc(windWord(c.wind))}.</p>
-    <p class="sub">Dagens högsta medelvind: ${a && a.wmax != null ? f1(a.wmax) + ' m/s' : '–'}. Vindriktning visas inte, den hämtas inte från källorna.</p></section>`;
+    <p class="sub">${c.gust == null ? '' : `Byvindar ${f1(c.gust)} m/s. `}${esc(windWord(c.wind))}.</p>
+    <p class="sub">Dagens högsta: ${a && a.wmax != null ? f1(a.wmax) + ' m/s' : '–'}</p></section>`;
   const cardCloud = `<section class="wc" aria-labelledby="cc"><h3 id="cc">Molnighet</h3>
     <p class="big">${c.cloud == null ? '–' : Math.round(c.cloud)} <small>% molntäcke</small></p>
     <div class="bar" aria-hidden="true"><i style="width:${c.cloud == null ? 0 : Math.round(c.cloud)}%"></i></div>
-    <p class="sub">${esc(cloudWord(c.cloud))} kl ${pad(hr)} (medel av källorna).</p></section>`;
+    <p class="sub">${esc(cloudWord(c.cloud))}</p></section>`;
   const wc = windChill(c.temp, c.wind);
   const cardFeels = `<section class="wc" aria-labelledby="cf"><h3 id="cf">Känns som</h3>
     <p class="big">${wc == null ? '–' : deg(wc)}</p>
-    <p class="sub">${wc == null ? 'Vindkyla räknas bara när det är högst 10 °C och blåser minst 1,3 m/s.' : `Vindkyla, beräknad från ${f1(c.temp)} °C och ${f1(c.wind)} m/s medelvind. Ungefärligt värde.`}</p></section>`;
+    <p class="sub">${wc == null ? 'Gäller vid högst 10 °C och lite vind.' : 'Vindkyla, ungefärligt värde.'}</p></section>`;
   const sun = sunTimes(day.date, state.loc.lat, state.loc.lon);
   let sunBody;
   if (sun.rise == null) sunBody = `<p class="big">${sun.up ? 'Midnattssol' : 'Polarnatt'}</p>`;
@@ -930,25 +964,37 @@ function renderWeather() {
     const fr = Math.max(0, Math.min(1, (cur.t + H / 2 - sun.rise) / (sun.set - sun.rise)));
     const up = cur.t + H / 2 >= sun.rise && cur.t + H / 2 < sun.set, dm = Math.round((sun.set - sun.rise) / 6e4);
     const px = 60 - 52 * Math.cos(Math.PI * fr), py = 56 - 52 * Math.sin(Math.PI * fr);
-    sunBody = `<p class="big">${clockFmt.format(sun.rise)} <small>till</small> ${clockFmt.format(sun.set)}</p>
-      <svg viewBox="0 0 120 62" width="100%" height="56" role="img" aria-label="Solens bana över dagen"><path d="M8 56A52 52 0 0 1 112 56" fill="none" stroke="#cfd9cf" stroke-width="2"/><path d="M2 56H118" stroke="#5a6e65" stroke-width="1"/>${up ? `<circle cx="${px.toFixed(1)}" cy="${py.toFixed(1)}" r="5" fill="#eeb82e" stroke="#14332a" stroke-width="1.2"/>` : ''}</svg>
-      <p class="sub">Dagsljus ${Math.floor(dm / 60)} h ${dm % 60} min. Beräknad utifrån plats och datum (ca ±2 min), inte hämtad från källorna.</p>`;
+    sunBody = `<div class="sunrow"><div><p class="sub" style="margin:0">Soluppgång</p><p class="big">${clockFmt.format(sun.rise)}</p></div>
+      <svg viewBox="0 0 120 62" height="64" role="img" aria-label="Solens bana över dagen"><path d="M8 56A52 52 0 0 1 112 56" fill="none" stroke="#cfd9cf" stroke-width="2"/><path d="M2 56H118" stroke="#5a6e65" stroke-width="1"/>${up ? `<circle cx="${px.toFixed(1)}" cy="${py.toFixed(1)}" r="5" fill="#eeb82e" stroke="#14332a" stroke-width="1.2"/>` : ''}</svg>
+      <div class="r"><p class="sub" style="margin:0">Solnedgång</p><p class="big">${clockFmt.format(sun.set)}</p></div></div>
+      <p class="sub">Dagsljus ${Math.floor(dm / 60)} h ${dm % 60} min</p>`;
   }
-  const cardSun = `<section class="wc" aria-labelledby="cs"><h3 id="cs">Sol</h3>${sunBody}</section>`;
+  const cardSun = `<section class="wc span2" aria-labelledby="cs"><h3 id="cs">Sol</h3>${sunBody}</section>`;
   const ag = cur.agree, nUsed = c.ids.length;
-  const cardSrc = `<section class="wc span2" aria-labelledby="cq"><h3 id="cq">Källor: enighet och färskhet</h3>
-    <p class="sub" style="margin-top:0">${nUsed < 2 ? 'Bara en källa har data för den här timmen, så ingen jämförelse går att göra.' : ag.length ? `Källorna skiljer sig åt kl ${pad(hr)}: ${ag.map((x) => `<span class="badge">${esc(x)}</span>`).join('')}` : `Källorna är överens kl ${pad(hr)} om nederbörd, temperatur och vind.`}</p>
-    <div style="margin-top:6px">${sourcesHtml()}</div>
-    <p class="sub">Enighet beskriver hur lika prognoserna är, inte om vädret är bra för en aktivitet.</p></section>`;
+  const cardSrc = `<section class="wc span2" aria-labelledby="cq"><h3 id="cq">Källor</h3>
+    <p class="sub" style="margin-top:0">${nUsed < 2 ? 'Bara en källa har data för den här timmen.' : ag.length ? `Källorna skiljer sig åt kl ${pad(hr)}: ${ag.map((x) => `<span class="badge">${esc(x)}</span>`).join('')}` : `Källorna är överens kl ${pad(hr)}.`}</p>
+    <div style="margin-top:6px">${sourcesHtml()}</div></section>`;
+
+  // ----- Om prognosen (utfällbar): hur värdena räknas -----
+  const rng = isFinite(gmin) ? `${deg(gmin)} till ${deg(gmax)}` : '';
+  const about = `<details class="cmp" id="about" ${state.aboutOpen ? 'open' : ''}><summary>Om prognosen</summary>
+    <ul class="ab">
+      <li>${esc(srcLine(c))}</li>
+      ${partialToday ? '<li>Dagens högsta och lägsta gäller återstående timmar.</li>' : ''}
+      <li>Sammanvägt värde är medelvärdet av de källor som har data för timmen. En saknad källa räknas aldrig som 0.</li>
+      <li>Dagens högsta, lägsta, nederbörd och vind är medel av källornas egna dagsvärden. Staplarna i veckolistan delar skala${rng ? ' (' + rng + ')' : ''}.</li>
+      <li>Väderbeskrivningen härleds från molntäcke och nederbörd. Ingen källa anger den.</li>
+      <li>Sol upp och ned är beräknad från plats och datum (ca ±2 min). Känns som är vindkyla och räknas bara vid högst 10 °C och minst 1,3 m/s vind.</li>
+      <li>Nederbörd i kortet gäller timmen, dygnssumman gäller hela dygnet. Medelvind är något annat än byvind.</li>
+    </ul></details>`;
 
   // ----- Jämför källor (utfällbar, samma tabell som i Planera men utan aktivitetsfärger) -----
   const cmp = `<details class="cmp" id="cmp" ${state.cmpOpen ? 'open' : ''}><summary>Jämför väderkällor</summary>
     <div>${sourcesHtml()}</div>
-    ${detailTable(day, false, cur.t)}
-    <p class="note">Enighet beskriver hur lika prognoserna är, inte om vädret passar en aktivitet. Ett – betyder att källan saknar prognos för timmen (inte noll).</p></details>`;
+    ${detailTable(day, false, cur.t, '❄ = snö enligt källan. Orange ram = källorna oense om nederbörd. Kursiv = interpolerad. – = källan saknar prognos (inte noll). Enighet visar hur lika prognoserna är, inte om vädret passar en aktivitet.')}</details>`;
 
   const prev = $('hstrip'), prevLeft = prev ? prev.scrollLeft : 0;
-  el.innerHTML = `<div class="wx">${sum}${hourly}<div class="wx-main">${week}<div class="cg">${cardPrecip}${cardWind}${cardCloud}${cardFeels}${cardSun}${cardSrc}</div></div>${cmp}</div>`;
+  el.innerHTML = `<div class="wx">${sum}${hourly}<div class="wx-main">${week}<div class="cg">${cardPrecip}${cardWind}${cardCloud}${cardFeels}${cardSun}${cardSrc}</div></div>${about}${cmp}</div>`;
   const hs = $('hstrip');
   if (hs) {
     const selEl = hs.querySelector('[aria-pressed="true"]');
@@ -1012,7 +1058,7 @@ document.addEventListener('keydown', (e) => { // piltangenter mellan flikarna
   if (e.key === 'ArrowRight' || e.key === 'ArrowLeft') i = 1 - i; else if (e.key === 'Home') i = 0; else if (e.key === 'End') i = 1; else return;
   e.preventDefault(); const v = ['plan', 'weather'][i]; setView(v); $('tab-' + v).focus();
 });
-document.addEventListener('toggle', (e) => { if (e.target.id === 'cmp') state.cmpOpen = e.target.open; }, true);   // minns utfälld jämförelse
+document.addEventListener('toggle', (e) => { if (e.target.id === 'cmp') state.cmpOpen = e.target.open; else if (e.target.id === 'about') state.aboutOpen = e.target.open; }, true);   // minns utfällda delar
 document.addEventListener('change', (e) => {
   const t = e.target, mode = state.modes[state.act];
   if (t.dataset.l) { const v = parseFloat(String(t.value).replace(',', '.')); mode.limits[t.dataset.l] = isNaN(v) ? null : v; save(); render(); }
