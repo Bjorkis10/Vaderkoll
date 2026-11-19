@@ -1,0 +1,105 @@
+# PROJECT.md – Väderkoll
+
+## Mål
+Mobilvänlig enfils-app (`index.html`) som visar SMHI, Yr (MET Norway) och DMI sida vid sida, timme för timme,
+markerar var källorna är överens/oense och ger grön/gul/röd poäng för aktiviteter (Golf, Promenad/löpning,
+Cykling, Grillning, egna lägen). Standardplats: **Ljungbyhed GK** (ungefärlig position 56.078, 13.230 – justera vid behov).
+
+## Funktioner
+- Platssökning (Open-Meteo geocoding, bara Sverige), koordinater (`56.08, 13.23`) och sparade favoriter.
+- Tre källor sida vid sida: temp, nederbörd (mm/h), vind + byvind (m/s), molnighet (%).
+- Enighet: orange ram + etikett när källorna är oense om regn (`regn 1/3`), temp (≥3 °C spridning) eller vind (≥3 m/s).
+- Aktivitetslägen med justerbara gränsvärden (temp min/max, regn, vind, byvind, moln, gul marginal %); egna lägen kan skapas/tas bort.
+  Läge "Ingen" = rå prognos.
+- Tidsfilter (standard 07–19) och "bästa fönster" per dag (längsta gröna, annars gröna/gula, minst N timmar).
+- Cache 30 min i localStorage; vid fel visas gammal cache (status `stale`). Källa som är nere kraschar inte appen.
+- Allt sparas i localStorage: plats, favoriter, läge, gränser, tidsfilter.
+
+## Konfiguration (överst i scriptet, `CONFIG`)
+| Variabel | Beskrivning |
+|---|---|
+| `CACHE_MIN` | Cachetid i minuter (30). |
+| `DAYS` | Antal dagar i vyn (7). |
+| `DEFAULT_LOC` | Startplats. |
+
+## Arkitektur
+En statisk `index.html` (GitHub Pages) som anropar SMHI, MET Norway, DMI och Open-Meteo direkt från webbläsaren. Ingen backend, inga hemligheter. Se `SETUP.md`.
+
+## Datakällor (verifierade med riktiga anrop 2026-11-19)
+| Källa | Endpoint | Nyckel | Täckning | Anmärkning |
+|---|---|---|---|---|
+| SMHI | `https://opendata-download-metfcst.smhi.se/api/category/snow1g/version/1/geotype/point/lon/{lon}/lat/{lat}/data.json` | nej | ~10 dygn (1 h första ~2 d, sedan 3/6/12 h) | Ersätter pmp3g (nedlagt 31 mars 2026). `time` = intervallets slut; moln i oktas (×12,5 → %); nederbörd = `precipitation_amount_mean` (mm över intervallet). |
+| MET/Yr | `https://api.met.no/weatherapi/locationforecast/2.0/complete?lat={lat}&lon={lon}` | nej | ~10 dygn (1 h första ~2,5 d, sedan 6 h) | `complete` ger byvind (`wind_speed_of_gust`, saknas i 6 h-delen). Nederbörd från `next_1_hours` resp. `next_6_hours`. CORS fungerar utan egen header. Skicka **inte** User-Agent från webbläsaren (Firefox ger då CORS-fel "NetworkError"). |
+| DMI | `https://opendataapi.dmi.dk/v1/forecastedr/collections/harmonie_dini_sf/position?coords=POINT(lon lat)&crs=crs84&parameter-name=temperature-2m,wind-speed-10m,gust-wind-speed-10m,total-precipitation,fraction-of-cloud-cover&f=GeoJSON` | nej (krävdes tidigare; slopat 2 dec 2025) | 60 h (HARMONIE DINI, ~2 km) | Verifierat live: 61 timsteg (~60 h), `step` = giltighetstid, temp i Kelvin, moln som andel 0–1, `total-precipitation` ackumulerad (differens; små nedhopp = brus). Strypt till ~1 anrop/10 s (appen väntar in), 429 vid hög belastning. CORS fungerar. |
+| Geokodning | `https://geocoding-api.open-meteo.com/v1/search?name=..&countryCode=SE&language=sv` | nej | – | Endast platssökning. |
+
+Villkor: SMHI öppna data (ange källa), MET Norway Terms of Service (webbappar identifieras via Origin; respektera
+`Expires`/cache, inga täta anrop – appens 30 min cache följer detta), DMI Frie data (fair use, ange källa).
+Använd bara för icke-kommersiellt bruk som specat.
+
+## Gemensamt dataformat
+Råformat per källa: `{ entries:[{t,temp,wind,gust,cloud}], precip:[{s,e,mm}] }` (tider i ms UTC; temp °C; vind m/s; moln %).
+`buildHourly(raw)` gör en `Map(timmestart -> {temp,wind,gust,cloud,precip,coarse})`. Grövre steg interpoleras linjärt,
+nederbörd fördelas jämnt över intervallet, `coarse:true` visas kursivt i UI.
+
+## Poängmodell
+- Per källa och timme: `judge(limits, hour)` → 0 grön / 1 gul / 2 röd. Gul = överträdelse inom marginalen
+  (`max(|gräns|·tol%, golv)`; golv: temp 2 °C, regn 0,2 mm, vind 1,5 m/s, byvind 2 m/s, moln 10 %), röd = mer.
+- Samlat: snitt över källorna (<0,5 grön, <1,25 gul, annars röd).
+- Dag: andel gröna (gul = ½) i tidsfönstret: ≥80 % grön, ≥50 % gul, annars röd.
+
+## Kända begränsningar / att göra
+- DMI-parametrarna och svarsformatet är verifierade live, men appen har inte körts i en riktig webbläsare med UI över längre tid (logiken är testad i Node med mockad och riktig data).
+- DMI räcker bara 60 h – dagar därefter visas bara SMHI + Yr (samlad poäng baseras på de källor som finns).
+- Standardpositionen för Ljungbyhed GK är approximativ; prognoserna är rutnät på ~2–3 km så skillnaden är liten.
+- SMHI:s nederbörd: `precipitation_amount_mean` kan vara 0 trots att min/max >0 (ensemble-spridning) – alternativ är
+  `_median`, `_max` eller `_mean_deterministic`; byt i `SOURCES.smhi` vid behov.
+- Efter ~2–3 dygn är SMHI/Yr grövre (3–6 h) – timvärdena är då interpolerade, inte verkliga timprognoser.
+- Prognoser jämförs inte mot observationer; poängen är en tumregel, inte en garanti.
+- Tidszon är fast Europe/Stockholm; sommartid hanteras av `Intl`.
+- Stickprov mot källornas egna webbsidor (yr.no, smhi.se) gjordes inte visuellt – jämförelsen gjordes mot källornas rå-API-svar.
+- Ingen automatisk uppdatering i bakgrunden; tryck "Uppdatera" (cachen är 30 min).
+- Idéer: byvind-tröskel i golfläget, vindriktning, UV, PWA/offline, graf per dag.
+- Väder-vyn är testad i Node (mockade källor) och i Chrome via Playwright med mockade svar och fast klocka, inte mot live-API i en riktig användarwebbläsare. Skärmläsare/tangentbord är kodat (aria-pressed, tablist, fokusåterställning) men inte provat med skärmläsare.
+
+
+## Design (scorekort)
+
+Sidan är formgiven som ett golf-scorekort: veckan är ett kort med en rad per dag och en ruta per timme (grön/gul/röd, röd har snedstreck för färgblinda). Orange triangel = källorna oense om regn. Tjock understrykning = bästa fönstret. Läget "Ingen" visar regnintensitet i blått. Hero-texten svarar i klartext på när det passar bäst. Färger och typsnitt finns som CSS-variabler överst i `index.html`. Inga externa typsnitt eller bibliotek.
+
+
+## Snö (nederbördstyp)
+
+Varje källa levererar nu en snöandel (0–1) per nederbördsperiod: `precip: [{s,e,mm,snow}]`, `snow = null` om okänt.
+- SMHI: `precipitation_frozen_part` (fraktion, -9 = saknas), annars `predominant_precipitation_type_at_surface` (5/6 snö, 7 blandat).
+- Yr: `symbol_code` i `next_1_hours`/`next_6_hours` (innehåller `snow` eller `sleet`).
+- DMI: ökning av `time-integral-of-total-solid-precipitation-flux` delat med ökning av `total-precipitation` (DMI:s `precipitation-type` var tom vid test).
+En källa räknas som snö vid minst 0,1 mm och snöandel >= 0,5. En timme får ❄ när minst hälften av källorna med nederbörd säger snö. Cache-nyckeln är `sv2:cache:` så gammal cache utan snödata ignoreras.
+Läget "Vintergolf" (min 3 °C, max 0,2 mm, max 8 m/s) har lagts till bland standardlägena.
+Obs: snölogiken är enhetstestad med syntetisk data, inte mot verkligt snöfall (det snöade inte vid testet).
+
+
+## Två vyer: Planera och Väder
+
+Appen har en vyväxlare (`Planera | Väder`) under platsraden. Det är **samma sida och samma data**: båda vyerna läser `state.src` / `buildDays()`,
+och att byta vy anropar bara `render()`, aldrig `load()` (inga nya prognosanrop). Vald vy sparas i `sv1:settings` som `view` (`"plan"` | `"weather"`,
+standard `plan` för befintliga användare). Plats, favoriter, vald dag, aktivitet, egna lägen, gränsvärden, tidsfilter och cache delas av båda vyerna.
+`state.selDay` är delad; `state.selHour` (vald timme) och `state.cmpOpen` (utfälld källjämförelse) gäller bara Väder och sparas inte.
+
+- **Planera** = scorekortet (oförändrad poängsättning: `judge`, `consensus`, `agreement`, `bestWindow`). Gult betyder gränsfall som oftast är användbart, inte olämpligt.
+  Gul har prickmönster, röd snedstreck, så färgen är aldrig ensam bärare. Heron (bästa tiden över hela perioden) och dagens understrukna bästa fönster är två skilda saker.
+- **Väder** = allmän prognos, färgas aldrig efter aktivitetens gränsvärden: stor temperatur med stämningsbakgrund (klart/moln/regn/snö/natt),
+  scrollbar timremsa (hela dygnet, ignorerar Planeras tidsfilter), veckolista med gemensam temperaturskala, kort (nederbörd, vind, molnighet, känns som, sol, källor)
+  och utfällbar "Jämför väderkällor" (samma `detailTable()` som Planera, men utan aktivitetsfärger).
+
+### Hur Väder räknar (se kommentaren ovanför `combine()` i koden)
+- Samlad timme = medelvärde över de källor som har ett värde just den timmen. Saknad källa lämnas utanför (aldrig 0). Gäller temp, nederbörd, vind, byvind, moln.
+- Dagens högsta/lägsta, nederbördssumma och högsta vind = `dayAvg()` (medel av källornas egna dagsvärden), här över hela dygnet. För idag gäller värdena återstående timmar.
+- Väderbeskrivning/symbol är **härledd** (ingen källa anger den): nederbörd >= 0,1 mm/h ger regn/snö (lätt < 0,5, < 2, kraftigt >= 2 mm/h; snö vid snöandel >= 50 %, blandat 20–50 %), annars molntäcke (<20 % klart, <45 mest klart, <70 halvklart, <90 mestadels molnigt, annars mulet). Dagens symbol: regn/snö om dygnssumman >= 0,5 mm, annars molntäcke 06–18.
+- Sol upp/ned är **beräknad** med astronomisk formel (`sunTimes`, ca ±2 min, kontrollerad mot Stockholm 21 dec) och styr dag/natt-symboler och bakgrund. Inte hämtad.
+- Känns som = vindkyla (kanadensiska formeln), bara vid <= 10 °C och >= 1,3 m/s medelvind. Annars visas "–" med förklaring.
+- Kursiv temperatur i timremsan = alla bidragande källor är interpolerade från grövre tidssteg.
+- Allt är prognoser. Appen visar inga observationer och hävdar inget om banans tillgänglighet eller skick.
+
+### Medvetet utelämnat (finns inte i det normaliserade datat)
+Vindriktning, luftfuktighet, UV och sikt. De skulle kräva ändringar i alla tre adaptrar (`SOURCES`) och DMI-parametrar. Lägg till i `entries` först, sedan i kort.
