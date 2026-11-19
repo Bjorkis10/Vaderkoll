@@ -48,3 +48,7 @@ Obs: snölogiken är enhetstestad med syntetisk data, inte mot verkligt snöfall
 
 ## Vyer
 Se PROJECT.md ("Två vyer"). `render()` väljer `renderPlan()`/`renderWeather()`; byte av vy får aldrig anropa `load()`. Vyn sparas som `view` i `sv1:settings`. Ändra inte `judge/consensus/agreement/bestWindow` utan att ändra poängmodellen i PROJECT.md.
+
+
+## Väderbilder
+Väder-vyns bilder styrs av EN klassificering, `classify()`/`describe()` (se PROJECT.md "Väderbilder"). Text, sammanfattningsscen (`wxScene`), timikon och veckoikon (`wIcon`) ska alltid använda samma `describe`-resultat. Regn/snö kommer från nederbördsdata, aldrig temperatur. Animationer: bara transform/opacity, måste respektera `prefers-reduced-motion`. Rör inte Planera.

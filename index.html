@@ -201,6 +201,41 @@
   .s-desc{font-size:19px}
   .s-hl{margin:2px 0 0;font-size:15px}
   .s-src{margin:6px auto 0;font-size:13.5px}
+
+  /* Väderbild: scenen ligger till höger i kortet (ändrar inte höjden), texten till vänster */
+  .sum{--aw:clamp(150px,38vw,340px);text-align:left;padding-right:calc(var(--aw) + 8px);min-height:176px}
+  .sum::before{display:none}
+  .sum>.art{position:absolute;top:0;right:0;bottom:0;width:var(--aw);margin:0;pointer-events:none;overflow:hidden;
+    -webkit-mask-image:linear-gradient(90deg,transparent,#000 26%);mask-image:linear-gradient(90deg,transparent,#000 26%)}
+  .art svg{display:block;width:100%;height:100%}
+  .s-desc{justify-content:flex-start}
+  .s-src{margin:6px 0 0;max-width:none}
+  .sum[data-tone="neutral"]{--sky:linear-gradient(180deg,#dde5e1,#eef2ee)}
+  .sum[data-tone="night"]{--sky:linear-gradient(180deg,#0f2733,#1b3d4a 65%,#24494f)}
+  /* Lätta animationer: bara transform/opacity på få element */
+  .art .drift{animation:wxdrift var(--t,20s) ease-in-out infinite alternate}
+  .art .glow{animation:wxglow 7s ease-in-out infinite alternate}
+  .art .drop{animation:wxdrop 1.6s linear infinite;animation-delay:var(--d,0s)}
+  .art .flake{animation:wxflake 6s linear infinite;animation-delay:var(--d,0s)}
+  .art .tw{animation:wxtw 4.5s ease-in-out infinite;animation-delay:var(--d,0s)}
+  @keyframes wxdrift{from{transform:translateX(calc(var(--dx,10px) * -1))}to{transform:translateX(var(--dx,10px))}}
+  @keyframes wxglow{from{opacity:.75}to{opacity:1}}
+  @keyframes wxdrop{0%{transform:translate(4px,-22px);opacity:0}15%{opacity:1}85%{opacity:1}100%{transform:translate(-8px,46px);opacity:0}}
+  @keyframes wxflake{0%{transform:translate(0,-18px);opacity:0}15%{opacity:1}85%{opacity:1}100%{transform:translate(14px,46px);opacity:0}}
+  @keyframes wxtw{0%,100%{opacity:.35}50%{opacity:1}}
+  @media (prefers-reduced-motion:reduce){.art *{animation:none!important}}
+  #viewWeather[hidden] .art *{animation-play-state:paused}
+  @media (max-width:700px){
+    .sum>.art{top:22px;bottom:44px}
+    .s-when,.s-hl,.s-src{margin-right:calc(-1 * (var(--aw) + 6px))}
+    .s-when{font-size:13.5px}
+    .art svg{position:absolute;top:50%;right:-40px;width:auto;height:132px;aspect-ratio:400/240;transform:translateY(-50%)}
+    .sum{--aw:132px;padding:12px 0 12px 14px;padding-right:calc(var(--aw) + 6px);min-height:0}
+    .s-temp{font-size:clamp(56px,17vw,72px)}
+    .s-desc{font-size:17px}
+    .s-hl{font-size:14px}
+    .s-src{font-size:12.5px}
+  }
   @media (max-width:700px){
     .s-place{display:none}
     .chip{padding:6px 12px;font-size:14px}
@@ -772,29 +807,41 @@ function combine(r) {
     coarse: hs.every((h) => h.coarse),   // kursivt bara om ingen källa har finare tidssteg
   };
 }
-function describe(c, night) { // {key,label} eller null om varken nederbörd eller moln finns
-  if (c.precip != null && c.precip >= 0.1) {
-    const lvl = c.precip < 0.5 ? 0 : c.precip < 2 ? 1 : 2;
-    if (c.snow != null && c.snow >= 0.5) return { key: 'snow', label: ['Lätt snöfall', 'Snöfall', 'Kraftigt snöfall'][lvl] };
-    if (c.snow != null && c.snow >= 0.2) return { key: 'sleet', label: 'Snöblandat regn' };
-    return { key: 'rain', label: ['Lätt regn', 'Regn', 'Kraftigt regn'][lvl] };
+// ----- Delad väderklassificering: EN källa till sanning för text, symbol och bild -----
+// c = {precip (mm/h), snow (0-1 eller null), cloud (%)}. Returnerar
+//   key:   clear | partly | cloud | rain | sleet | snow | unknown
+//   cover: molnighet för bilden: clear | few | half | mostly | overcast ('' vid okänt)
+//   lvl:   nederbördsstyrka 0-3 (0 = torrt)
+//   label: svensk text ('' när data saknas -> neutral bild, ingen text)
+// Regn/snö avgörs bara av nederbörd + snöandel, aldrig av temperatur.
+function classify(c) {
+  const p = c.precip, sn = c.snow;
+  if (p != null && p >= 0.1) {
+    const lvl = p < 0.5 ? 1 : p < 2 ? 2 : 3;
+    if (sn != null && sn >= 0.5) return { key: 'snow', cover: 'overcast', lvl, label: ['Lätt snöfall', 'Snöfall', 'Kraftigt snöfall'][lvl - 1] };
+    if (sn != null && sn >= 0.2) return { key: 'sleet', cover: 'overcast', lvl, label: 'Snöblandat regn' };
+    // okänd nederbördstyp (snow == null): rita regn men skriv bara "nederbörd"
+    return { key: 'rain', cover: 'overcast', lvl, label: (sn == null ? ['Lätt nederbörd', 'Nederbörd', 'Kraftig nederbörd'] : ['Lätt regn', 'Regn', 'Kraftigt regn'])[lvl - 1] };
   }
-  const k = c.cloud; if (k == null) return null;
-  if (k < 20) return { key: 'clear', label: 'Klart' };
-  if (k < 45) return { key: 'partly', label: 'Mest klart' };
-  if (k < 70) return { key: 'partly', label: 'Halvklart' };
-  if (k < 90) return { key: 'cloud', label: 'Mestadels molnigt' };
-  return { key: 'cloud', label: 'Mulet' };
+  const k = c.cloud;
+  if (k == null) return { key: 'unknown', cover: '', lvl: 0, label: '' };   // neutral reserv, aldrig solsken
+  if (k < 20) return { key: 'clear', cover: 'clear', lvl: 0, label: 'Klart' };
+  if (k < 45) return { key: 'partly', cover: 'few', lvl: 0, label: 'Mest klart' };
+  if (k < 70) return { key: 'partly', cover: 'half', lvl: 0, label: 'Halvklart' };
+  if (k < 90) return { key: 'cloud', cover: 'mostly', lvl: 0, label: 'Mestadels molnigt' };
+  return { key: 'cloud', cover: 'overcast', lvl: 0, label: 'Mulet' };
 }
+const describe = (c, night) => Object.assign(classify(c), { night: !!night });
+// Dagens symbol i veckolistan: nederbörd om dygnet ger minst 0,5 mm, annars molnighet 06-18. Aldrig natt.
 function daySymbol(day, a) {
   const cs = day.hours.map(combine).filter(Boolean);
-  if (a && a.rain != null && a.rain >= 0.5) {
-    const wet = cs.filter((c) => c.precip != null && c.precip >= 0.1);
-    const sn = wet.length && wet.filter((c) => c.snow != null && c.snow >= 0.5).length * 2 >= wet.length;
-    return { key: sn ? 'snow' : 'rain' };
-  }
   const dayHrs = cs.filter((c) => { const h = localParts(c.t).hour; return h >= 6 && h < 18; });
-  return describe({ precip: 0, cloud: mean((dayHrs.length ? dayHrs : cs).map((c) => c.cloud)) }, false);
+  const cloud = mean((dayHrs.length ? dayHrs : cs).map((c) => c.cloud));
+  if (a && a.rain != null && a.rain >= 0.5) {
+    const wet = cs.filter((c) => c.precip != null && c.precip >= 0.1), known = wet.filter((c) => c.snow != null);
+    return describe({ precip: wet.length ? mean(wet.map((c) => c.precip)) : 0.5, snow: known.length ? mean(known.map((c) => c.snow)) : null, cloud }, false);
+  }
+  return describe({ precip: 0, cloud }, false);
 }
 const windWord = (v) => v == null ? '' : v < 4 ? 'Svag vind' : v < 8 ? 'Måttlig vind' : v < 14 ? 'Frisk vind' : v < 21 ? 'Hård vind' : 'Storm';
 const cloudWord = (p) => p == null ? '' : p < 20 ? 'Klart' : p < 45 ? 'Mest klart' : p < 70 ? 'Halvklart' : p < 90 ? 'Mestadels molnigt' : 'Mulet';
@@ -823,7 +870,9 @@ function sunTimes(date, lat, lon) {
 }
 function isNight(t) {
   const m = t + H / 2, s = sunTimes(localParts(t).date, state.loc.lat, state.loc.lon);
-  return s.rise == null ? !s.up : (m < s.rise || m >= s.set);
+  if (s.rise == null) return s.up == null ? false : !s.up;           // midnattssol/polarnatt
+  if (!isFinite(s.rise) || !isFinite(s.set)) return false;           // soltider saknas: anta dag
+  return m < s.rise || m >= s.set;
 }
 
 // Temperaturfärg för staplarna i veckolistan (kallt blått -> grönt -> gult -> orange)
@@ -837,23 +886,64 @@ function tempColor(t) {
   return `rgb(${st[st.length - 1][1]})`;
 }
 
-// Enkla inline-SVG-symboler (48x48)
-function wIcon(key, night, px) {
-  const rays = (cx, cy, r1, r2) => Array.from({ length: 8 }, (_, i) => { const a = i * Math.PI / 4; return `M${(cx + r1 * Math.cos(a)).toFixed(1)} ${(cy + r1 * Math.sin(a)).toFixed(1)}L${(cx + r2 * Math.cos(a)).toFixed(1)} ${(cy + r2 * Math.sin(a)).toFixed(1)}`; }).join('');
-  const sun = (cx, cy, r) => `<circle cx="${cx}" cy="${cy}" r="${r}" fill="#eeb82e"/><path d="${rays(cx, cy, r + 3, r + 7)}" stroke="#eeb82e" stroke-width="2.6" stroke-linecap="round"/>`;
-  const moon = (x, y, s) => `<path transform="translate(${x} ${y}) scale(${s})" d="M10 2a14 14 0 1 0 14 18A11 11 0 0 1 10 2z" fill="#f4e6a8" stroke="#14332a" stroke-width="1.3" stroke-linejoin="round"/>`;
-  const cloud = (x, y, s) => `<path transform="translate(${x} ${y}) scale(${s})" d="M14 36h20a8 8 0 0 0 1.2-15.9A10 10 0 0 0 16 18.5 8.8 8.8 0 0 0 14 36z" fill="#fff" stroke="#14332a" stroke-width="1.6" stroke-linejoin="round"/>`;
-  const drops = `<path d="M17 38l-2.5 6M25 38l-2.5 6M33 38l-2.5 6" stroke="#2c6e91" stroke-width="2.4" stroke-linecap="round"/>`;
-  const flakes = `<circle cx="17" cy="41" r="2" fill="#2c6e91"/><circle cx="25" cy="44" r="2" fill="#2c6e91"/><circle cx="33" cy="41" r="2" fill="#2c6e91"/>`;
+// ----- Väderbilder (inline-SVG, mjuka platta former, inga externa filer) -----
+// Gemensamma byggstenar: moln = rektangel + tre cirklar. Små ikoner (48x48) och sammanfattningsscenen delar formspråk.
+const cloudG = (x, y, w, f) => `<g fill="${f}"><rect x="${x + .08 * w}" y="${y + .28 * w}" width="${.87 * w}" height="${.22 * w}" rx="${.11 * w}"/><circle cx="${x + .3 * w}" cy="${y + .3 * w}" r="${.2 * w}"/><circle cx="${x + .55 * w}" cy="${y + .22 * w}" r="${.26 * w}"/><circle cx="${x + .78 * w}" cy="${y + .32 * w}" r="${.17 * w}"/></g>`;
+const moonG = (x, y, r, f, extra = '') => `<g transform="translate(${x} ${y}) rotate(-20)"><path d="M0 ${-r}A${r} ${r} 0 0 0 0 ${r}A${1.3 * r} ${1.3 * r} 0 0 1 0 ${-r}Z" fill="${f}" ${extra}/></g>`;
+const isWet = (k) => k === 'rain' || k === 'snow' || k === 'sleet';
+
+// Liten ikon (timremsa, veckolista, sammanfattningens rad). st = resultat från describe().
+function wIcon(st, px) {
+  const n = st.night, wet = isWet(st.key), cv = st.cover;
+  const C = n ? ['#4a6572', '#6a8794'] : wet ? ['#7d95a2', '#a9bbc5'] : ['#8fa6b2', '#b9c9d1'];   // bak, fram
+  const sun = (x, y, r) => `<circle cx="${x}" cy="${y}" r="${r * 1.45}" fill="#f2c24c" opacity=".28"/><circle cx="${x}" cy="${y}" r="${r}" fill="#f2c24c" stroke="#c99a22" stroke-width="1"/>`;
+  const moon = (x, y, r) => moonG(x, y, r, '#ecd98f', 'stroke="#b59a40" stroke-width="1"');
+  const lum = (x, y, r) => n ? moon(x, y, r) : sun(x, y, r);
+  const rain = (xs) => xs.map((x) => `<path d="M${x} 36l-2.4 6" stroke="#4a86ad" stroke-width="2.4" stroke-linecap="round"/>`).join('');
+  const flake = (xs) => xs.map((x, i) => `<circle cx="${x}" cy="${i % 2 ? 43 : 40}" r="2.2" fill="#fff" stroke="#4a86ad" stroke-width="1"/>`).join('');
   let g;
-  if (key === 'clear') g = night ? moon(11, 11, 1.1) : sun(24, 24, 9);
-  else if (key === 'partly') g = (night ? moon(4, 2, .8) : sun(17, 17, 7)) + cloud(6, 8, .86);
-  else if (key === 'cloud') g = cloud(0, 3, 1);
-  else if (key === 'rain') g = cloud(0, -3, 1) + drops;
-  else if (key === 'snow') g = cloud(0, -3, 1) + flakes;
-  else g = cloud(0, -3, 1) + `<path d="M17 38l-2.5 6M33 38l-2.5 6" stroke="#2c6e91" stroke-width="2.4" stroke-linecap="round"/><circle cx="25" cy="43" r="2" fill="#2c6e91"/>`;
+  if (st.key === 'unknown') g = `<path d="M13 34h22a7 7 0 0 0 1-13.9A10 10 0 0 0 17 19a8 8 0 0 0-4 15z" fill="none" stroke="#8fa6b2" stroke-width="2" stroke-dasharray="3 3"/>`;
+  else if (cv === 'clear') g = lum(24, 24, n ? 11 : 10);
+  else if (cv === 'few') g = lum(19, 18, 8) + cloudG(14, 20, 28, C[1]);
+  else if (cv === 'half') g = lum(18, 17, 8) + cloudG(8, 18, 34, C[1]);
+  else if (wet) g = cloudG(5, 4, 30, C[0]) + cloudG(11, 9, 32, C[1]) + (st.key === 'rain' ? rain([16, 24, 32]) : st.key === 'snow' ? flake([16, 24, 32]) : rain([16, 32]) + flake([24]));
+  else g = cloudG(4, 8, 28, C[0]) + cloudG(10, 15, 34, C[1]);
   return `<svg viewBox="0 0 48 48" width="${px}" height="${px}" aria-hidden="true" focusable="false">${g}</svg>`;
 }
+
+// Sammanfattningens bakgrundsscen (400x240, förankrad till höger). Rent dekorativ: aria-hidden, inga klick.
+// Varje scen får egna gradient-id:n (räknare) så att flera bilder aldrig krockar.
+let wxUid = 0;
+function wxScene(st) {
+  const u = 'wx' + (++wxUid), n = st.night, wet = isWet(st.key), cv = st.cover;
+  const P = n ? (wet ? ['#182f39', '#243d49', '#33505c'] : ['#1e3a46', '#2c4955', '#3d5b68']) : (wet ? ['#8da3ae', '#aebfc7', '#cdd9de'] : ['#b4c5cc', '#d0dce0', '#f6f9f7']);
+  const cl = (x, y, w, f, dx, dur) => `<g class="drift" style="--dx:${dx}px;--t:${dur}s">${cloudG(x, y, w, f)}</g>`;
+  const sun = (x, y, r) => `<circle class="glow" cx="${x}" cy="${y}" r="${r * 2}" fill="url(#${u}s)"/><circle cx="${x}" cy="${y}" r="${r}" fill="#f2c24c"/>`;
+  const moon = (x, y, r) => `<circle class="glow" cx="${x}" cy="${y}" r="${r * 2}" fill="url(#${u}m)"/>` + moonG(x, y, r, '#ecd98f');
+  const lum = (x, y, r) => n ? moon(x, y, r) : sun(x, y, r);
+  const starAt = [[40, 30], [96, 70], [150, 22], [210, 56], [250, 20], [330, 40], [370, 90], [300, 150], [60, 130]];
+  const nStars = n && !wet ? { clear: 9, few: 7, half: 5, mostly: 3, overcast: 0 }[cv] || 0 : 0;
+  const stars = starAt.slice(0, nStars).map(([x, y], i) => `<circle class="tw" cx="${x}" cy="${y}" r="${i % 3 ? 1.4 : 2}" fill="#f1f5ef" style="--d:${-i * 0.7}s"/>`).join('');
+  let g = '';
+  if (st.key === 'unknown') g = `<g opacity=".45">${cloudG(200, 70, 170, '#fff')}</g>`;
+  else if (cv === 'clear') g = lum(272, 112, 44);
+  else if (cv === 'few') g = lum(280, 96, 40) + cl(196, 126, 130, P[2], 10, 16);
+  else if (cv === 'half') g = lum(268, 86, 38) + cl(110, 98, 190, P[0], 14, 20) + cl(206, 120, 160, P[2], -12, 17);
+  else if (wet) {
+    const cnt = (k) => [0, 9, 13, 17][st.lvl] * (k === 'drop' ? 1 : 1) + (k === 'flake' ? 2 : 0);
+    const nd = st.key === 'rain' ? cnt('drop') : st.key === 'sleet' ? 6 : 0, nf = st.key === 'snow' ? cnt('flake') : st.key === 'sleet' ? 7 : 0;
+    const dc = n ? '#9cc3da' : '#4a86ad', pos = (i, m) => [140 + (i * 233 / m) % 240 + (i % 2) * 6, 150 + (i * 37) % 70];
+    const drops = Array.from({ length: nd }, (_, i) => { const [x, y] = pos(i, nd); return `<line class="drop" x1="${x}" y1="${y}" x2="${x - 5}" y2="${y + 15}" stroke="${dc}" stroke-width="3" stroke-linecap="round" style="--d:${-(i * 0.37).toFixed(2)}s"/>`; }).join('');
+    const flakes = Array.from({ length: nf }, (_, i) => { const [x, y] = pos(i + 3, nf); return `<circle class="flake" cx="${x}" cy="${y}" r="${i % 3 ? 3 : 4}" fill="#fff" stroke="${n ? '#9cc3da' : '#6c9fc0'}" stroke-width="1.2" style="--d:${-(i * 0.83).toFixed(2)}s"/>`; }).join('');
+    g = cl(150, 26, 190, P[0], 12, 22) + cl(225, 40, 150, P[1], -10, 18) + drops + flakes + cl(172, 54, 184, P[2], 8, 20);
+  } else if (cv === 'mostly') g = `<g opacity=".55">${lum(280, 80, 34)}</g>` + cl(110, 56, 200, P[0], 12, 22) + cl(200, 88, 170, P[1], -10, 18) + cl(126, 124, 190, P[2], 8, 20);
+  else g = cl(110, 50, 200, P[0], 12, 22) + cl(200, 84, 170, P[1], -10, 18) + cl(126, 122, 190, P[2], 8, 20);
+  return `<svg viewBox="0 0 400 240" preserveAspectRatio="xMaxYMid slice" aria-hidden="true" focusable="false"><defs>`
+    + `<radialGradient id="${u}s"><stop offset="0" stop-color="#f7d46a" stop-opacity=".6"/><stop offset="1" stop-color="#f7d46a" stop-opacity="0"/></radialGradient>`
+    + `<radialGradient id="${u}m"><stop offset="0" stop-color="#ecd98f" stop-opacity=".35"/><stop offset="1" stop-color="#ecd98f" stop-opacity="0"/></radialGradient></defs>${stars}${g}</svg>`;
+}
+// Bakgrundston för sammanfattningen
+const toneOf = (st) => st.key === 'unknown' ? 'neutral' : st.night ? 'night' : ({ rain: 'rain', sleet: 'rain', snow: 'snow', cloud: 'cloud' }[st.key] || 'clear');
 
 function pickHour(day) { // idag: aktuell timme, annars timmen närmast 12
   if (relDay(day.date) === 'Idag') return day.hours[0];
@@ -887,17 +977,18 @@ function renderWeather() {
   const cur = day.hours.find((r) => r.t === state.selHour) || pickHour(day);
   const c = combine(cur), a = dayAvg(day), night = isNight(cur.t), desc = describe(c, night);
   const hr = localParts(cur.t).hour, isToday = relDay(day.date) === 'Idag';
-  const tone = night ? 'night' : desc ? ({ rain: 'rain', sleet: 'rain', snow: 'snow', cloud: 'cloud' }[desc.key] || 'clear') : 'clear';
+  const tone = toneOf(desc);
   const stale = Object.keys(SOURCES).filter((id) => (state.src[id] || {}).status === 'stale').map((id) => SOURCES[id].name);
 
   // ----- Sammanfattning (kort: detaljerna ligger under "Om prognosen") -----
   const partialToday = isToday && day.hours[0] && localParts(day.hours[0].t).hour > 0;
   const staleTxt = stale.length ? ` Obs: gammal data från ${esc(stale.join(' och '))}.` : '';
   const sum = `<section class="sum" data-tone="${tone}" aria-label="Sammanfattning">
+    <div class="art" aria-hidden="true">${wxScene(desc)}</div>
     <p class="s-when">Prognos: ${esc(longDay(day.date))}, kl ${pad(hr)}–${pad((hr + 1) % 24)}</p>
     <p class="s-place">${esc(state.loc.name)}</p>
     <p class="s-temp" aria-label="${c.temp == null ? 'temperatur saknas' : 'prognos ' + Math.round(c.temp) + ' grader'}">${deg(c.temp)}</p>
-    ${desc ? `<div class="s-desc">${wIcon(desc.key, night, 30)}<span>${desc.label}</span></div>` : ''}
+    ${desc.label ? `<div class="s-desc"><span>${desc.label}</span></div>` : ''}
     ${a ? `<p class="s-hl">${partialToday ? 'Resten av dagen: h' : 'H'}ögst ${deg(a.tmax)}, lägst ${deg(a.tmin)}</p>` : ''}
     <p class="s-src">${esc(srcShort(c))}${staleTxt}</p>
   </section>`;
@@ -906,8 +997,8 @@ function renderWeather() {
   const strip = day.hours.map((r) => {
     const cc = combine(r), nt = isNight(r.t), dd = describe(cc, nt), h = localParts(r.t).hour;
     const pr = cc.precip != null && cc.precip >= 0.1 ? f1(cc.precip) : '';
-    const lbl = `kl ${pad(h)}, ${cc.temp == null ? 'temperatur saknas' : Math.round(cc.temp) + ' grader'}${dd ? ', ' + dd.label.toLowerCase() : ''}${pr ? ', nederbörd ' + pr + ' mm' : ''}`;
-    return `<button class="hi${cc.coarse ? ' ip' : ''}" data-a="hour" data-t="${r.t}" data-fk="wh${r.t}" aria-pressed="${r.t === cur.t}" aria-label="${esc(lbl)}"><span class="tm">${pad(h)}</span>${dd ? wIcon(dd.key, nt, 30) : '<span class="ic0"></span>'}<span class="tp">${deg(cc.temp)}</span><span class="pr">${pr}</span></button>`;
+    const lbl = `kl ${pad(h)}, ${cc.temp == null ? 'temperatur saknas' : Math.round(cc.temp) + ' grader'}${dd.label ? ', ' + dd.label.toLowerCase() : ''}${pr ? ', nederbörd ' + pr + ' mm' : ''}`;
+    return `<button class="hi${cc.coarse ? ' ip' : ''}" data-a="hour" data-t="${r.t}" data-fk="wh${r.t}" aria-pressed="${r.t === cur.t}" aria-label="${esc(lbl)}"><span class="tm">${pad(h)}</span>${wIcon(dd, 30)}<span class="tp">${deg(cc.temp)}</span><span class="pr">${pr}</span></button>`;
   }).join('');
   const hourly = `<section class="wc" aria-labelledby="hh"><h3 id="hh">Timprognos, ${esc(longDay(day.date).toLowerCase())}</h3>
     <div class="hs" id="hstrip" role="group" aria-label="Välj timme">${strip}</div>
@@ -926,7 +1017,7 @@ function renderWeather() {
     const lbl = `${longDay(d.date)}, ${da ? 'högst ' + deg(da.tmax) + ', lägst ' + deg(da.tmin) : 'temperatur saknas'}, ${rainTxt.replace('❄ ', 'snö, ')}, data från ${used}`;
     return `<button class="wr" data-a="wday" data-d="${d.date}" data-fk="wd${d.date}" aria-pressed="${d.date === selDay}" aria-label="${esc(lbl)}">
       <span class="dn">${esc(nm)}<small>${new Date(noon(d.date)).getUTCDate()} ${esc(monFmt.format(noon(d.date)).replace('.', ''))}</small></span>
-      <span class="wi">${sym ? wIcon(sym.key, false, 28) : ''}</span>
+      <span class="wi">${wIcon(sym, 28)}</span>
       <span class="rg"><span class="lo">${da ? deg(da.tmin) : '–'}</span><span class="trk">${da ? `<i style="left:${left.toFixed(1)}%;width:${wdt.toFixed(1)}%;background:linear-gradient(90deg,${tempColor(da.tmin)},${tempColor(da.tmax)})"></i>` : ''}</span><span class="hg">${da ? deg(da.tmax) : '–'}</span></span>
       <span class="pp">${esc(rainTxt)}</span></button>`;
   }).join('');

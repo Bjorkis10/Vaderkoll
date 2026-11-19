@@ -105,3 +105,22 @@ standard `plan` för befintliga användare). Plats, favoriter, vald dag, aktivit
 
 ### Medvetet utelämnat (finns inte i det normaliserade datat)
 Vindriktning, luftfuktighet, UV och sikt. De skulle kräva ändringar i alla tre adaptrar (`SOURCES`) och DMI-parametrar. Lägg till i `entries` först, sedan i kort.
+
+## Väderbilder i Väder-vyn (visuell tillståndslogik)
+Inline-SVG (inga bilder, ikonbibliotek eller emoji). Rör aldrig Planera (poäng, lägen, tröskelvärden, bästa fönster).
+
+**EN klassificering:** `classify(c)` (+ `describe(c, night)`) tar `{precip, snow, cloud}` från `combine()` och ger
+`{key, cover, lvl, label, night}`. Samma objekt styr text, sammanfattningsbild, timikon och veckoikon, så bild och text kan inte säga emot varandra.
+- Nederbörd ≥ 0,1 mm/h: styrka `lvl` 1/2/3 vid <0,5 / <2 / ≥2 mm. Snöandel ≥ 0,5 → `snow`; 0,2–0,5 → `sleet` (Snöblandat regn); annars `rain`.
+  Okänd typ (`snow == null`): ritas som regn men texten är "Nederbörd". Temperatur används aldrig för regn/snö.
+- Torrt: molnighet <20 klart, <45 `few` (Mest klart), <70 `half` (Halvklart), <90 `mostly` (Mestadels molnigt), annars `overcast` (Mulet).
+- Saknas både nederbörd och moln → `unknown`: neutral streckad molnikon, neutral bakgrund, ingen text (aldrig solsken).
+- Natt: `isNight(t)` använder `sunTimes` för den valda dagen och platsen; midnattssol/polarnatt hanteras, saknade soltider → dag. Valt datum/timme styr, inte datorns klocka.
+- Veckoikon: `daySymbol` = nederbörd om dygnets nederbörd ≥ 0,5 mm (snöandel = medel av kända), annars medelmolnighet 06–18. Alltid dagikon.
+- Bakgrundston: `toneOf` → clear/cloud/rain/snow/night/neutral (CSS `.sum[data-tone]`).
+
+**Ritning:** `wIcon(st, px)` (48×48, små ikoner) och `wxScene(st)` (400×240, sammanfattningen) delar byggstenar `cloudG`/`moonG`. Scenen får egna gradient-id (`wx1s`, `wx1m`, …) via räknaren `wxUid`.
+**Layout:** `.sum` har texten till vänster och scenen (`.art`, `aria-hidden`, `pointer-events:none`, maskad mot texten) absolut till höger i en kolumn `--aw`; kortets höjd ändras inte (dator ≈243 px mot 250 tidigare, mobil ≈177 mot 193). På mobil ligger scenen mellan datumraden och högst/lägst-raden.
+**Animation:** bara `transform`/`opacity` på få element (molndrift, solglöd, droppar, flingor, stjärnor). `prefers-reduced-motion` stänger av alla (full statisk bild); `#viewWeather[hidden]` pausar.
+**Verifierat (Playwright mot lokala mockade fixturer, inget kvar i appen):** alla lägen dag/natt på dator och mobil, 320 px utan sidledsscroll, reduced-motion, unika id, inga extra nätanrop vid byte av dag/timme, saknad data, Planera byte-identisk mot förra versionen.
+**Begränsningar:** inte testat med skärmläsare eller på riktiga enheter; molnformerna är stiliserade; snö/regn visas som statiska positioner med lätt rörelse, inte en simulering.
