@@ -793,19 +793,21 @@ function diagnoseNoWindow(days, lim) {
 }
 
 // Inline-SVG jämförelsegraf för vald dag (temperaturkurvor per källa + spridningsband + nederbörd)
-function dayChartHtml(day, lim, hasLim) {
+function dayChartHtml(day, lim, hasLim, wPx) {  // wPx = tillgänglig bredd i px (så att texten blir läsbar), annars 680
   if (!day || day.hours.length < 2) return '';
   const hrs = day.hours;
   const temps = [];
   for (const r of hrs) for (const id in SOURCES) { const h = r.s[id]; if (h && h.temp != null) temps.push(h.temp); }
   if (temps.length < 2) return '';
   let tmin = Math.min(...temps), tmax = Math.max(...temps);
-  if (hasLim && lim.tempMin != null && lim.tempMin >= tmin - 4 && lim.tempMin <= tmax + 4) {
-    tmin = Math.min(tmin, lim.tempMin); tmax = Math.max(tmax, lim.tempMin);
-  }
-  const padT = Math.max(1.5, (tmax - tmin) * 0.18);
-  const lo = Math.floor(tmin - padT), hi = Math.ceil(tmax + padT), span = Math.max(1, hi - lo);
-  const W = 680, Hc = 136, L = 34, R = 14, T = 14, B = 24, cw = W - L - R, ch = Hc - T - B;
+  // Gränslinjen ritas bara när den ligger nära kurvorna, annars plattas kurvorna ut av en lång skala
+  const limNear = hasLim && lim.tempMin != null && lim.tempMin >= tmin - 2 && lim.tempMin <= tmax + 2;
+  if (limNear) { tmin = Math.min(tmin, lim.tempMin); tmax = Math.max(tmax, lim.tempMin); }
+  const padT = Math.max(1, (tmax - tmin) * 0.15);
+  // Jämna axelsteg (1, 2, 5 eller 10 grader), högst ca 4 intervall
+  const step = [1, 2, 5, 10].find((st) => (tmax - tmin + 2 * padT) / st <= 4) || 10;
+  const lo = Math.floor((tmin - padT) / step) * step, hi = Math.ceil((tmax + padT) / step) * step, span = Math.max(1, hi - lo);
+  const W = Math.max(300, Math.round(wPx || 680)), Hc = 156, L = 38, R = 14, T = 14, B = 26, cw = W - L - R, ch = Hc - T - B;
   const xOf = (i) => L + (hrs.length === 1 ? cw / 2 : (i / (hrs.length - 1)) * cw);
   const yOf = (v) => T + (1 - (v - lo) / span) * ch;
 
@@ -818,15 +820,15 @@ function dayChartHtml(day, lim, hasLim) {
       botPts.unshift(`${xOf(i).toFixed(1)},${yOf(Math.min(...vs)).toFixed(1)}`);
     }
   });
-  const band = topPts.length > 1 ? `<polygon points="${topPts.concat(botPts).join(' ')}" fill="#14332a" opacity=".09"/>` : '';
+  const band = topPts.length > 1 ? `<polygon points="${topPts.concat(botPts).join(' ')}" fill="#14332a" opacity=".13"/>` : '';
 
   // Horisontella hjälplinjer + eventuell gränslinje
-  const mid = Math.round((lo + hi) / 2);
-  const grid = [lo, mid, hi].map((v) => {
+  const ticks = []; for (let v = lo; v <= hi; v += step) ticks.push(v);
+  const grid = ticks.map((v) => {
     const y = yOf(v).toFixed(1);
-    return `<line x1="${L}" y1="${y}" x2="${W - R}" y2="${y}" stroke="#cfd9cf" stroke-width="1" stroke-dasharray="2 3"/><text x="${L - 6}" y="${+y + 4}" text-anchor="end" font-size="11" fill="#5a6e65">${v}°</text>`;
+    return `<line x1="${L}" y1="${y}" x2="${W - R}" y2="${y}" stroke="#cfd9cf" stroke-width="1" stroke-dasharray="2 3"/><text x="${L - 6}" y="${+y + 4}" text-anchor="end" font-size="11.5" fill="#5a6e65">${String(v).replace('-', '−')}°</text>`;
   }).join('');
-  const limLine = (hasLim && lim.tempMin != null && lim.tempMin >= lo && lim.tempMin <= hi)
+  const limLine = limNear
     ? `<line x1="${L}" y1="${yOf(lim.tempMin).toFixed(1)}" x2="${W - R}" y2="${yOf(lim.tempMin).toFixed(1)}" stroke="#3e9b58" stroke-width="1.4" stroke-dasharray="5 3"/><text x="${W - R - 2}" y="${(yOf(lim.tempMin) - 4).toFixed(1)}" text-anchor="end" font-size="10.5" fill="#17583a" font-weight="600">min ${f1(lim.tempMin)}°</text>`
     : '';
 
@@ -850,12 +852,14 @@ function dayChartHtml(day, lim, hasLim) {
   const lines = Object.keys(SOURCES).map((id) => {
     const pts = [];
     hrs.forEach((r, i) => { const h = r.s[id]; if (h && h.temp != null) pts.push(`${xOf(i).toFixed(1)},${yOf(h.temp).toFixed(1)}`); });
-    return pts.length > 1 ? `<polyline fill="none" ${styles[id] || ''} points="${pts.join(' ')}"/>` : '';
+    const col = (styles[id].match(/stroke="([^"]+)"/) || [])[1] || '#14332a';
+    const dots = hrs.length <= 14 ? pts.map((q) => `<circle cx="${q.split(',')[0]}" cy="${q.split(',')[1]}" r="2.4" fill="${col}"/>`).join('') : '';
+    return pts.length > 1 ? `<polyline fill="none" ${styles[id] || ''} points="${pts.join(' ')}"/>${dots}` : '';
   }).join('');
 
   // Tidsaxel
-  const step = hrs.length > 16 ? 3 : hrs.length > 10 ? 2 : 1;
-  const xAxis = hrs.map((r, i) => (i % step === 0) ? `<text x="${xOf(i).toFixed(1)}" y="${Hc - 6}" text-anchor="middle" font-size="11" fill="#5a6e65">${hhmm(r.t)}</text>` : '').join('');
+  const xStep = hrs.length > 16 ? 3 : hrs.length > 10 ? 2 : 1;
+  const xAxis = hrs.map((r, i) => (i % xStep === 0) ? `<text x="${xOf(i).toFixed(1)}" y="${Hc - 6}" text-anchor="middle" font-size="11" fill="#5a6e65">${hhmm(r.t)}</text>` : '').join('');
 
   return `<div class="dchart" aria-label="Temperatur- och nederbördsjämförelse över dagen">
     <div class="dchart-top">
@@ -949,7 +953,7 @@ function renderPlan() {
   // ----- Graf + timdetalj för vald dag -----
   const d = days.find((x) => x.date === selDay);
   $('detailTitle').textContent = `${longDay(d.date)}, timme för timme`;
-  if ($('dayChart')) $('dayChart').innerHTML = dayChartHtml(d, lim, hasLim);
+  if ($('dayChart')) $('dayChart').innerHTML = dayChartHtml(d, lim, hasLim, $('dayChart').clientWidth - 24);
   $('detail').innerHTML = detailTable(d, hasLim, state.selHour, null, lim);
 }
 
