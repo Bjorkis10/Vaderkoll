@@ -441,11 +441,16 @@ const SOURCES = {
     return { entries, precip };
   } },
 
-  dmi: { name: 'DMI', fetch: async (loc) => {
+  dmi: { name: 'DMI', cacheMin: 90, minForceMin: 10, fetch: async (loc) => {   // modellen uppdateras ca var 3:e timme -> längre cache
     // Sedan dec 2025 krävs ingen API-nyckel hos DMI (men fair use gäller). wind-speed-10m kräver crs=crs84.
     await dmiGate();
     const params = ['temperature-2m', 'wind-speed-10m', 'gust-wind-speed-10m', 'total-precipitation', 'time-integral-of-total-solid-precipitation-flux', 'fraction-of-cloud-cover'];
-    return parseDmi(await getJson(`https://opendataapi.dmi.dk/v1/forecastedr/collections/harmonie_dini_sf/position?coords=POINT(${loc.lon.toFixed(4)}%20${loc.lat.toFixed(4)})&crs=crs84&parameter-name=${params.join(',')}&f=GeoJSON`));
+    const url = `https://opendataapi.dmi.dk/v1/forecastedr/collections/harmonie_dini_sf/position?coords=POINT(${loc.lon.toFixed(4)}%20${loc.lat.toFixed(4)})&crs=crs84&parameter-name=${params.join(',')}&f=GeoJSON`;
+    // DMI svarar ofta 429 "Server is busy" för alla (även med få anrop): försök om upp till 3 gånger med paus
+    for (let k = 0; ; k++) {
+      try { return parseDmi(await getJson(url)); }
+      catch (e) { if (k >= 2 || !/HTTP (429|5\d\d)/.test(e.message)) throw e; await sleep(4000 * (k + 1)); }
+    }
   } },
 };
 
@@ -532,16 +537,19 @@ const meanDeg = (degs) => {
    ===================================================================== */
 async function loadSource(id, loc, force) {
   const key = `sv2:cache:${id}:${loc.lat.toFixed(3)},${loc.lon.toFixed(3)}`;
-  const c = lsGet(key, null), maxAge = CONFIG.CACHE_MIN * 60e3;
-  if (c && !force && Date.now() - c.ts < maxAge) return { status: 'ok', ts: c.ts, cached: true, raw: c.raw };
+  const c = lsGet(key, null), maxAge = (SOURCES[id].cacheMin || CONFIG.CACHE_MIN) * 60e3;
+  // ↻ hämtar om, men inte en källa som just hämtats (minForceMin) – sparar anrop hos överbelastade API:er
+  const fresh = c && (Date.now() - c.ts < (force ? (SOURCES[id].minForceMin || 0) * 60e3 : maxAge));
+  if (fresh) return { status: 'ok', ts: c.ts, cached: true, raw: c.raw };
   try {
     const raw = await SOURCES[id].fetch(loc);
     if (!raw.entries.length) throw new Error('Tomt svar');
     pruneCache(); lsSet(key, { ts: Date.now(), raw });
     return { status: 'ok', ts: Date.now(), raw };
   } catch (e) {
-    if (c) return { status: 'stale', ts: c.ts, msg: e.message, raw: c.raw };   // visa gammal data hellre än ingen
-    return { status: 'error', msg: e.message };
+    const msg = /HTTP 429/.test(e.message) ? 'servern är upptagen (429), försöker igen' : e.message;
+    if (c) return { status: 'stale', ts: c.ts, msg, raw: c.raw };   // visa gammal data hellre än ingen
+    return { status: 'error', msg };
   }
 }
 function pruneCache() { // håll max ~12 cache-poster så localStorage inte fylls
@@ -650,7 +658,22 @@ async function load(force) {
     const r = await loadSource(id, state.loc, force);
     if (r.raw) r.hours = buildHourly(r.raw);
     state.src[id] = r; render();
+    if (r.status === 'ok') retries[id] = 0; else retrySoon(id);
   }));
+}
+// Överbelastad källa: försök i bakgrunden igen efter en minut (högst 5 gånger), utan att störa övriga källor
+const retries = {};
+function retrySoon(id) {
+  const loc = state.loc; retries[id] = (retries[id] || 0) + 1;
+  if (retries[id] > 5) return;
+  setTimeout(async () => {
+    if (loc !== state.loc || (state.src[id] || {}).status === 'ok') return;
+    const r = await loadSource(id, loc, false);
+    if (loc !== state.loc) return;
+    if (r.raw) r.hours = buildHourly(r.raw);
+    state.src[id] = r; render();
+    if (r.status === 'ok') retries[id] = 0; else retrySoon(id);
+  }, 60e3);
 }
 
 /* =====================================================================

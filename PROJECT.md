@@ -132,3 +132,7 @@ Inline-SVG (inga bilder, ikonbibliotek eller emoji). Rör aldrig Planera (poäng
 - Vindriktning (`dir`, grader varifrån vinden blåser): SMHI `wind_from_direction`, Yr `wind_from_direction`, DMI `wind-dir-10m`. Obs: DMI-parametern är **inte verifierad mot riktiga data**; saknas den visas ingen riktning från DMI. Interpoleras cirkulärt (`lerpDeg`) och medelvärdesbildas som vektorer (`meanDeg`).
 - `📍 Min plats` i platspanelen använder webbläsarens `navigator.geolocation` (inget lagras utöver vald plats, ingen nyckel). Nekas åtkomst visas ett förklarande meddelande.
 - Testat i Node/Chrome med mockad data; geolokalisering bara i nekat-läget.
+
+
+### DMI och 429 (2026-11-19)
+DMI:s öppna API svarar intermittent 429 "Server is busy" (mätt: ~1 av 4 anrop, även med en parameter och >5 s mellanrum). Åtgärder: 90 min cache (`cacheMin`), ↻ hämtar inte om DMI inom 10 min (`minForceMin`), 3 försök med växande paus, bakgrundsförsök varje minut (`retrySoon`, max 5), annars visas senaste data med texten "servern är upptagen (429), försöker igen". Vindriktning begärs inte från DMI.

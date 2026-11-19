@@ -52,3 +52,5 @@ Se PROJECT.md ("Två vyer"). `render()` väljer `renderPlan()`/`renderWeather()`
 
 ## Väderbilder
 Väder-vyns bilder styrs av EN klassificering, `classify()`/`describe()` (se PROJECT.md "Väderbilder"). Text, sammanfattningsscen (`wxScene`), timikon och veckoikon (`wIcon`) ska alltid använda samma `describe`-resultat. Regn/snö kommer från nederbördsdata, aldrig temperatur. Animationer: bara transform/opacity, måste respektera `prefers-reduced-motion`. Rör inte Planera.
+
+- DMI svarar ibland 429 "Server is busy" för alla användare (verifierat 2026-11-19, även med ett enda litet anrop; inte vårt anropstak). Appen cachar DMI i 90 min, ↻ hoppar över DMI om data är yngre än 10 min, försöker 3 gånger med paus och sedan i bakgrunden en gång i minuten (max 5) och visar annars gammal data. `wind-dir-10m` begärs inte från DMI (ej verifierat).
