@@ -5,7 +5,7 @@
    - Nätet först: finns nät får man alltid senaste index.html (inga "fastnade" gamla versioner).
      Utan nät, eller om nätet inte svarar inom några sekunder, används den sparade kopian.
    Byt VERSION när listan med filer ändras. */
-const VERSION = 'vk-v1';
+const VERSION = 'vk-v2';
 const SHELL = ['./', './index.html', './manifest.webmanifest', './icon-192.png', './icon-512.png', './apple-touch-icon.png'];
 const TIMEOUT_MS = 4000;   // dålig mobiltäckning: vänta högst så här länge innan cachen används
 
@@ -24,7 +24,10 @@ self.addEventListener('fetch', (e) => {
   if (req.method !== 'GET' || new URL(req.url).origin !== self.location.origin) return;   // API-anrop går direkt till nätet
   // Nätanropet startas direkt; svaret sparas i cachen även om cachen hann svara först (waitUntil håller SW vid liv)
   let saved; e.waitUntil(new Promise((r) => { saved = r; }));
-  const net = fetch(req).then((res) => {
+  // Sidan själv: fråga alltid servern (no-cache = villkorlig hämtning, 304 om oförändrad). Annars kan webbläsarens
+  // HTTP-cache (GitHub Pages: ~10 min) ge en gammal index.html trots "nätet först".
+  const netReq = req.mode === 'navigate' ? fetch(req.url, { cache: 'no-cache', credentials: 'same-origin' }) : fetch(req);
+  const net = netReq.then((res) => {
     saved(res.ok ? caches.open(VERSION).then((c) => c.put(req, res.clone())).catch(() => {}) : null);
     return res;
   }, (err) => { saved(); throw err; });

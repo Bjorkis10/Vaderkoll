@@ -150,7 +150,7 @@ Appen går att lägga på hemskärmen ("Lägg till på hemskärmen" i Safari, "I
   Ikonen (flagga på green med sol) är ritad med ett litet PIL-skript och ligger som färdiga PNG:er.
 - `sw.js` cachar **bara appens egna filer**, nätet först (max 4 s väntan, sedan cache). Prognos-API:erna (andra domäner) passerar orörda;
   deras data cachas som förut i localStorage. Utan nät visas alltså appen + senast hämtade prognos (status `stale`).
-- Ändras listan med filer i `sw.js`: byt `VERSION` (t.ex. `vk-v2`). Ändringar i `index.html` kräver ingen versionsbump – nätet först ger alltid senaste.
+- Ändras listan med filer i `sw.js`: byt `VERSION` (nu `vk-v2`). Ändringar i `index.html` kräver ingen versionsbump: sidan hämtas med `cache: no-cache` (villkorlig hämtning), så webbläsarens HTTP-cache (~10 min på GitHub Pages) kan inte ge en gammal version.
 - `wake()` i slutet av scriptet: när appen visas igen (`visibilitychange`) eller nätet kommer tillbaka (`online`) hämtas bara källor
   vars cache gått ut, högst en gång per minut. Annars bara omritning (så "idag" och nu-markeringen stämmer).
 - SW registreras bara över https/localhost; `file://` fungerar som tidigare utan SW.
