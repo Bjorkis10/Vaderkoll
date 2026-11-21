@@ -14,7 +14,7 @@ Enkel väderapp på svenska som jämför prognoser från **SMHI**, **MET Norway 
 - Allt är **prognoser**, inte mätningar. Poängen i Planera är en tumregel, inte en garanti, och appen vet inget om banans tillgänglighet eller skick.
 - Efter 2–3 dygn är SMHI och Yr grövre (3–6 timmars steg) och timvärdena är då interpolerade (kursiv text). DMI räcker bara ca 60 timmar.
 - Prognoserna cachas i webbläsaren i 30 minuter. Tryck ↻ för att hämta på nytt. Om en källa är nere visas äldre data med en varning.
-- Appen följer telefonens mörka läge och kan installeras på hemskärmen (se `SETUP.md`).
+- Ljust eller mörkt läge väljs med ☾/☀ uppe till höger och sparas. Innan du valt följer appen telefonen. Appen kan installeras på hemskärmen (se `SETUP.md`).
 - Inställningar (plats, favoriter, aktivitet, gränsvärden, tider och vald vy) sparas bara i din egen webbläsare.
 
 ## Så är den byggd

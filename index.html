@@ -6,9 +6,17 @@
 <title>Väderkoll – jämför prognoser</title>
 <!-- PWA: installera på hemskärmen (manifest + sw.js + ikoner ligger bredvid index.html) -->
 <link rel="manifest" href="manifest.webmanifest">
-<meta name="theme-color" content="#f1f5ef" media="(prefers-color-scheme: light)">
-<meta name="theme-color" content="#0c1210" media="(prefers-color-scheme: dark)">
-<meta name="color-scheme" content="light dark">
+<meta name="theme-color" content="#f1f5ef" id="themeColor">
+<script>
+// Tema före första ritningen (så att mörkt läge inte blinkar vitt): sparat val ("theme" i sv1:settings), annars telefonens inställning
+(function () {
+  var t; try { t = (JSON.parse(localStorage.getItem('sv1:settings')) || {}).theme; } catch (e) {}
+  var dark = t ? t === 'dark' : !!(window.matchMedia && matchMedia('(prefers-color-scheme: dark)').matches);
+  document.documentElement.classList.toggle('dark', dark);
+  document.documentElement.style.colorScheme = dark ? 'dark' : 'light';
+  document.getElementById('themeColor').content = dark ? '#0c1210' : '#f1f5ef';
+})();
+</script>
 <link rel="icon" type="image/png" sizes="192x192" href="icon-192.png">
 <link rel="apple-touch-icon" href="apple-touch-icon.png">
 <meta name="apple-mobile-web-app-capable" content="yes">
@@ -318,70 +326,87 @@
     td.c b{font-size:15px;padding-right:12px}
     td.c .mk{position:absolute;top:5px;right:4px;float:none;margin:0}
     .wdir{display:block;margin:0}   /* vindriktningen på egen rad, så alla celler ser likadana ut */
-    .top-actions{gap:10px}
+    .top-actions{gap:6px}
+    .top>div:first-child{min-width:0}
+    .top .icon{width:36px;height:36px}
+    .upd{font-size:10.5px;margin-right:2px}
+    .place{font-size:22px;max-width:100%}
+    #locName{white-space:nowrap;overflow:hidden;text-overflow:ellipsis;min-width:0}
   }
 
-  /* ===== Mörkt läge (följer telefonens/datorns inställning) =====
+  /* ===== Mörkt läge =====
+     Gäller när <html> har klassen "dark". Klassen sätts av ett litet skript i <head> före första ritningen:
+     sparat val (☾/☀-knappen, "theme" i sv1:settings) eller annars telefonens/datorns inställning.
      Ljust läge är oförändrat; här byts färgvariablerna och de få hårdkodade ljusa ytorna. */
-  @media (prefers-color-scheme:dark){
-    /* Neutral nästan-svart bas (lite grön), kort ett tydligt steg ljusare. --line ersätter de mörkgröna ramarna
-       från ljust läge (som annars blir vita), --acc är en dämpad grön för det som är valt. */
-    :root{--ink:#e4ece7;--paper:#0c1210;--sheet:#151e1a;--rule:#26332d;--line:#3e5148;--mute:#97a9a0;
+  /* Neutral nästan-svart bas (lite grön), kort ett tydligt steg ljusare. --line ersätter de mörkgröna ramarna
+     från ljust läge (som annars blir vita), --acc är en dämpad grön för det som är valt. */
+  html.dark{--ink:#e4ece7;--paper:#0c1210;--sheet:#151e1a;--rule:#26332d;--line:#3e5148;--mute:#97a9a0;
       --good:#3f9259;--ok:#d0a536;--bad:#b9564b;--sea:#6aaed6;--acc:#79c08f;--accbg:#24432f;--hov:#1b2621;color-scheme:dark}
-    .icon:hover,.btn:hover,.res button:hover,.chip:hover,.chip.plus:hover{background:var(--hov)}
-    .chip,.btn,.views{border-color:var(--line)}
-    .chip.plus{border-color:var(--line)}
-    .chip.on,.views button[aria-selected="true"],.btn.pri{background:var(--accbg);color:#eef6f1;box-shadow:inset 0 0 0 1px #3f7352}
-    .chip.on{border-color:#3f7352}
-    .btn.pri:hover{background:#2c5139}
-    .hero{border-top:2px solid var(--line)}
-    .sc{border-color:var(--line)}
-    .drow.head,th{border-bottom-color:var(--line)}
-    .drow:hover,.hi:hover,.wr:hover{background:var(--hov)}
-    .drow.sel{background:#18241f;box-shadow:inset 3px 0 0 var(--acc)}
-    tr.selr td{background:#18241f;box-shadow:inset 0 1px 0 var(--line),inset 0 -1px 0 var(--line)}
-    tr.selr td:first-child{box-shadow:inset 3px 0 0 var(--acc),inset 0 1px 0 var(--line),inset 0 -1px 0 var(--line)}
-    .hi[aria-pressed="true"],.wr[aria-pressed="true"]{background:#18241f;border-color:var(--acc)}
-    .wr{box-shadow:0 1px 0 var(--rule)}
-    .h,.bar,.trk{background:#222d28}
-    .h.r0{background:#1d2723}.h.r1{background:#2b5068}.h.r2{background:#43809f}.h.r3{background:#6aaed6}
-    .h.s0{background:var(--good)}
-    .h.s1{background:var(--ok) radial-gradient(circle,rgba(10,18,14,.55) 1.1px,transparent 1.4px) 0 0/6px 6px}
-    .h.s2{background:var(--bad) repeating-linear-gradient(135deg,transparent 0 4px,rgba(255,255,255,.14) 4px 6px)}
-    .h.dark{background:#19221e radial-gradient(circle at 70% 30%,rgba(255,255,255,.2) .8px,transparent 1.4px) 0 0/7px 7px;box-shadow:none}   /* mörkt: tyst, nästan som bakgrunden */
-    .h.na{background:transparent}
-    .h.best{border-bottom-color:var(--acc);box-shadow:inset 0 2px 0 rgba(121,192,143,.7)}
-    .drow:not(.head) .h:hover{box-shadow:0 2px 6px rgba(0,0,0,.5)}
-    /* Tabellen: svag ton i cellen, färgen bärs av ✓ ~ ✕ i hörnet i stället för hela ytan */
-    td.src0{background:rgba(63,146,89,.07)}td.src1{background:rgba(208,165,54,.09)}td.src2{background:rgba(185,86,75,.1)}
-    td.src0 .mk{color:#6fc48a}td.src1 .mk{color:#e6c15a}td.src2 .mk{color:#e88a7e}
-    .wr:not([aria-pressed="true"]){box-shadow:none;background:linear-gradient(var(--rule),var(--rule)) center bottom/calc(100% - 16px) 1px no-repeat}
-    .wr:not([aria-pressed="true"]):hover{background-color:var(--hov)}
-    .dchart{border-color:var(--rule)}
-    .badge{background:#4a3115;color:#ffd39a}
-    .badge.ok{background:#1d3d2a;color:#9fe0b4}
-    .badge.why{background:#45201c;color:#f3b3aa}
-    .badge.why1{background:#3f3512;color:#f0d77d}
-    .badge.nb{background:#26382f;color:var(--ink)}
-    .src.error,.src.stale{color:#f08f82}
-    .panel,.sc{box-shadow:none}
-    /* SVG-grafer ritade med ljusa färger i attributen */
-    .dchart text,.sunrow text{fill:var(--mute)}
-    .dchart line[stroke="#cfd9cf"],.sunrow path[stroke="#cfd9cf"]{stroke:var(--rule)}
-    .sunrow path[stroke="#5a6e65"]{stroke:var(--mute)}
-    .dchart polygon{fill:#e2ebe5}
-    .dchart polyline[stroke="#14332a"]{stroke:#e2ebe5}
-    .dchart circle[fill="#14332a"]{fill:#e2ebe5}
-    .dchart polyline[stroke="#2c6e91"]{stroke:#6aaed6}.dchart circle[fill="#2c6e91"]{fill:#6aaed6}
-    .dchart polyline[stroke="#8c564b"]{stroke:#d29b8f}.dchart circle[fill="#8c564b"]{fill:#d29b8f}
-    .dchart-leg i.yr{border-color:#6aaed6}.dchart-leg i.dmi{border-color:#d29b8f}
-    /* Väder-sammanfattningen: mörka himlar */
-    .sum{--mute:#b9cbc2}
-    .sum[data-tone="clear"]{--sky:linear-gradient(180deg,#1d3f52,#183140 60%,#14251f)}
-    .sum[data-tone="cloud"],.sum[data-tone="neutral"]{--sky:linear-gradient(180deg,#2a3936,#1d2b27 65%,#15221d)}
-    .sum[data-tone="rain"]{--sky:linear-gradient(180deg,#203644,#1a2d35 65%,#142420)}
-    .sum[data-tone="snow"]{--sky:linear-gradient(180deg,#2c3f4c,#22333c 65%,#18272a)}
-  }
+  html.dark .icon:hover,html.dark .btn:hover,html.dark .res button:hover,html.dark .chip:hover,html.dark .chip.plus:hover{background:var(--hov)}
+  html.dark .chip,html.dark .btn,html.dark .views{border-color:var(--line)}
+  html.dark .chip.plus{border-color:var(--line)}
+  html.dark .chip.on,html.dark .views button[aria-selected="true"],html.dark .btn.pri{background:var(--accbg);color:#eef6f1;box-shadow:inset 0 0 0 1px #3f7352}
+  html.dark .chip.on{border-color:#3f7352}
+  html.dark .btn.pri:hover{background:#2c5139}
+  html.dark .hero{border-top:2px solid var(--line)}
+  html.dark .sc{border-color:var(--line)}
+  html.dark .drow.head,html.dark th{border-bottom-color:var(--line)}
+  html.dark .drow:hover,html.dark .hi:hover,html.dark .wr:hover{background:var(--hov)}
+  html.dark .drow.sel{background:#18241f;box-shadow:inset 3px 0 0 var(--acc)}
+  html.dark tr.selr td{background:#18241f;box-shadow:inset 0 1px 0 var(--line),inset 0 -1px 0 var(--line)}
+  html.dark tr.selr td:first-child{box-shadow:inset 3px 0 0 var(--acc),inset 0 1px 0 var(--line),inset 0 -1px 0 var(--line)}
+  html.dark .hi[aria-pressed="true"],html.dark .wr[aria-pressed="true"]{background:#18241f;border-color:var(--acc)}
+  html.dark .wr{box-shadow:0 1px 0 var(--rule)}
+  html.dark .h,html.dark .bar,html.dark .trk{background:#222d28}
+  html.dark .h.r0{background:#1d2723}
+  html.dark .h.r1{background:#2b5068}
+  html.dark .h.r2{background:#43809f}
+  html.dark .h.r3{background:#6aaed6}
+  html.dark .h.s0{background:var(--good)}
+  html.dark .h.s1{background:var(--ok) radial-gradient(circle,rgba(10,18,14,.55) 1.1px,transparent 1.4px) 0 0/6px 6px}
+  html.dark .h.s2{background:var(--bad) repeating-linear-gradient(135deg,transparent 0 4px,rgba(255,255,255,.14) 4px 6px)}
+  html.dark .h.dark{background:#19221e radial-gradient(circle at 70% 30%,rgba(255,255,255,.2) .8px,transparent 1.4px) 0 0/7px 7px;box-shadow:none}
+  /* mörka timmar ovan: tysta, nästan som bakgrunden */
+  html.dark .h.na{background:transparent}
+  html.dark .h.best{border-bottom-color:var(--acc);box-shadow:inset 0 2px 0 rgba(121,192,143,.7)}
+  html.dark .drow:not(.head) .h:hover{box-shadow:0 2px 6px rgba(0,0,0,.5)}
+  /* Tabellen: svag ton i cellen, färgen bärs av ✓ ~ ✕ i hörnet i stället för hela ytan */
+  html.dark td.src0{background:rgba(63,146,89,.07)}
+  html.dark td.src1{background:rgba(208,165,54,.09)}
+  html.dark td.src2{background:rgba(185,86,75,.1)}
+  html.dark td.src0 .mk{color:#6fc48a}
+  html.dark td.src1 .mk{color:#e6c15a}
+  html.dark td.src2 .mk{color:#e88a7e}
+  html.dark .wr:not([aria-pressed="true"]){box-shadow:none;background:linear-gradient(var(--rule),var(--rule)) center bottom/calc(100% - 16px) 1px no-repeat}
+  html.dark .wr:not([aria-pressed="true"]):hover{background-color:var(--hov)}
+  html.dark .dchart{border-color:var(--rule)}
+  html.dark .badge{background:#4a3115;color:#ffd39a}
+  html.dark .badge.ok{background:#1d3d2a;color:#9fe0b4}
+  html.dark .badge.why{background:#45201c;color:#f3b3aa}
+  html.dark .badge.why1{background:#3f3512;color:#f0d77d}
+  html.dark .badge.nb{background:#26382f;color:var(--ink)}
+  html.dark .src.error,html.dark .src.stale{color:#f08f82}
+  html.dark .panel,html.dark .sc{box-shadow:none}
+  /* SVG-grafer ritade med ljusa färger i attributen */
+  html.dark .dchart text,html.dark .sunrow text{fill:var(--mute)}
+  html.dark .dchart line[stroke="#cfd9cf"],html.dark .sunrow path[stroke="#cfd9cf"]{stroke:var(--rule)}
+  html.dark .sunrow path[stroke="#5a6e65"]{stroke:var(--mute)}
+  html.dark .dchart polygon{fill:#e2ebe5}
+  html.dark .dchart polyline[stroke="#14332a"]{stroke:#e2ebe5}
+  html.dark .dchart circle[fill="#14332a"]{fill:#e2ebe5}
+  html.dark .dchart polyline[stroke="#2c6e91"]{stroke:#6aaed6}
+  html.dark .dchart circle[fill="#2c6e91"]{fill:#6aaed6}
+  html.dark .dchart polyline[stroke="#8c564b"]{stroke:#d29b8f}
+  html.dark .dchart circle[fill="#8c564b"]{fill:#d29b8f}
+  html.dark .dchart-leg i.yr{border-color:#6aaed6}
+  html.dark .dchart-leg i.dmi{border-color:#d29b8f}
+  /* Väder-sammanfattningen: mörka himlar */
+  html.dark .sum{--mute:#b9cbc2}
+  html.dark .sum[data-tone="clear"]{--sky:linear-gradient(180deg,#1d3f52,#183140 60%,#14251f)}
+  html.dark .sum[data-tone="cloud"],html.dark .sum[data-tone="neutral"]{--sky:linear-gradient(180deg,#2a3936,#1d2b27 65%,#15221d)}
+  html.dark .sum[data-tone="rain"]{--sky:linear-gradient(180deg,#203644,#1a2d35 65%,#142420)}
+  html.dark .sum[data-tone="snow"]{--sky:linear-gradient(180deg,#2c3f4c,#22333c 65%,#18272a)}
+
 </style>
 </head>
 <body>
@@ -393,6 +418,7 @@
     </div>
     <div class="top-actions">
       <span id="upd" class="upd" aria-live="polite"></span>
+      <button class="icon" id="themeBtn" data-a="theme"></button>
       <button class="icon" id="refresh" data-a="refresh" aria-label="Uppdatera prognoserna" title="Uppdatera prognoserna">↻</button>
     </div>
   </header>
@@ -775,11 +801,26 @@ const state = {
   modes: Object.assign(JSON.parse(JSON.stringify(PRESETS)), saved.modes || {}),
   from: saved.from ?? 7, to: saved.to ?? 19,   // (äldre versioner sparade ett gemensamt minLen; nu finns det per läge)
   view: saved.view === 'weather' ? 'weather' : 'plan',   // vald vy (sparas)
+  theme: saved.theme === 'dark' || saved.theme === 'light' ? saved.theme : null,   // null = följ telefonen tills man tryckt ☾/☀
   tee: Object.assign({ date: null, time: '10:00', dur: 4 }, saved.tee || {}),   // "Kolla en starttid" (date sparas inte meningsfullt, väljs om)
   selDay: null, selHour: null, editOpen: false, teeOpen: false, placeOpen: false, animDone: false, cmpOpen: false, aboutOpen: false, center: true, fk: null,
   src: {},   // id -> {status, ts, msg, hours}
 };
-function save() { lsSet('sv1:settings', { loc: state.loc, favs: state.favs, act: state.act, modes: state.modes, from: state.from, to: state.to, view: state.view, tee: { time: state.tee.time, dur: state.tee.dur } }); }
+function save() { lsSet('sv1:settings', { loc: state.loc, favs: state.favs, act: state.act, modes: state.modes, from: state.from, to: state.to, view: state.view, theme: state.theme, tee: { time: state.tee.time, dur: state.tee.dur } }); }
+
+// Ljust/mörkt. Knappen visar det läge man byter TILL (☾ i ljust, ☀ i mörkt). Valet sparas; innan dess följs telefonen.
+const darkMq = window.matchMedia ? matchMedia('(prefers-color-scheme: dark)') : null;
+const MOON = '<svg viewBox="0 0 24 24" width="19" height="19" aria-hidden="true"><path d="M20 14.5A8.5 8.5 0 0 1 9.5 4a8.5 8.5 0 1 0 10.5 10.5z" fill="currentColor"/></svg>';
+const SUN = '<svg viewBox="0 0 24 24" width="20" height="20" aria-hidden="true" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><circle cx="12" cy="12" r="4.2" fill="currentColor" stroke="none"/><path d="M12 2.5v2.2M12 19.3v2.2M2.5 12h2.2M19.3 12h2.2M5.3 5.3l1.6 1.6M17.1 17.1l1.6 1.6M5.3 18.7l1.6-1.6M17.1 6.9l1.6-1.6"/></svg>';
+const isDark = () => state.theme ? state.theme === 'dark' : !!(darkMq && darkMq.matches);
+function applyTheme() {
+  const dark = isDark(), root = document.documentElement;
+  root.classList.toggle('dark', dark); root.style.colorScheme = dark ? 'dark' : 'light';
+  $('themeColor').content = dark ? '#0c1210' : '#f1f5ef';
+  const b = $('themeBtn'), lbl = dark ? 'Byt till ljust läge' : 'Byt till mörkt läge';
+  b.innerHTML = dark ? SUN : MOON; b.setAttribute('aria-label', lbl); b.title = lbl;
+}
+if (darkMq && darkMq.addEventListener) darkMq.addEventListener('change', () => { if (!state.theme) applyTheme(); });
 
 async function load(force) {
   for (const id in SOURCES) state.src[id] = { status: 'loading' };
@@ -1623,6 +1664,7 @@ document.addEventListener('click', (e) => {
   const el = e.target.closest('[data-a]'); if (!el) return;
   const a = el.dataset.a, mode = state.modes[state.act];
   if (a === 'refresh') load(true);
+  else if (a === 'theme') { state.theme = isDark() ? 'light' : 'dark'; save(); applyTheme(); }
   else if (a === 'togglePlace') { state.placeOpen = !state.placeOpen; render(); if (state.placeOpen) $('q').focus(); }
   else if (a === 'search') search();
   else if (a === 'geo') useGeo();
@@ -1692,6 +1734,7 @@ function fillSelects() {
 }
 
 fillSelects();
+applyTheme();
 load(false);
 
 // PWA: en installerad app ligger ofta kvar öppen i bakgrunden i dagar. När den visas igen (eller nätet kommer

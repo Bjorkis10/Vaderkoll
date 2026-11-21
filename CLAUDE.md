@@ -59,5 +59,5 @@ Väder-vyns bilder styrs av EN klassificering, `classify()`/`describe()` (se PRO
 
 ## Golfförbättringar (2026-11-21)
 Se PROJECT.md "Golfförbättringar och UI". Kort: lägen har `minLen`/`daylight`/`frost` (läs alltid via `modeOpt()`), mörka timmar får
-`r.c = null` + `r.dark` (vädrets poäng i `r.wc`), mörkt läge ligger i en egen `prefers-color-scheme`-block sist i CSS.
+`r.c = null` + `r.dark` (vädrets poäng i `r.wc`), mörkt läge = regler med prefixet `html.dark` sist i CSS (klassen sätts av skriptet i `<head>` och `applyTheme()`, valet sparas som `theme` i `sv1:settings`).
 Återställning till versionen före: `git revert` av commiten, eller återställ filerna från taggen `fore-forbattringar`.

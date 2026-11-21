@@ -170,7 +170,10 @@ Appen går att lägga på hemskärmen ("Lägg till på hemskärmen" i Safari, "I
 - **Dela (`shareText`):** `navigator.share` (telefonens delningsmeny), annars urklipp. Text + appens adress, inga personuppgifter.
 - **Säsong:** nya användare (inga sparade inställningar) startar i Vintergolf nov–mar, annars Golf. Befintliga behåller sitt val.
 - **Mobiltabell:** under 600 px ligger Samlat/Enighet under klockslaget (`.tsum`), kolumnen `.sumc` döljs, ✓/~/✕ ligger i hörnet.
-- **Mörkt läge:** `@media (prefers-color-scheme:dark)` sist i CSS byter variabler och de hårdkodade ljusa ytorna (inkl. SVG-grafer och himlar i Väder).
+- **Mörkt läge:** regler med prefixet `html.dark` sist i CSS byter variabler och de hårdkodade ljusa ytorna (inkl. SVG-grafer och himlar i Väder).
+  Klassen `dark` sätts av ett litet skript i `<head>` före första ritningen (ingen vit blixt): sparat val `theme` (`"light"`/`"dark"`) i
+  `sv1:settings`, annars `prefers-color-scheme`. Knappen ☾/☀ bredvid ↻ (`applyTheme`) växlar och sparar; innan man tryckt följer appen telefonen,
+  även om den byter läge medan appen är öppen. `<meta name="theme-color">` uppdateras också.
   Ljust läge är oförändrat. Ny hårdkodad färg i CSS/SVG? Lägg till en mörk motsvarighet där.
   Princip (omgjord samma dag): neutral nästan-svart bas, kort ett steg ljusare, `--line` i stället för de mörkgröna ramarna
   (som annars blev vita), dämpad grön accent `--acc`/`--accbg` för valda knappar/dag/timme, mörka timmar nästan osynliga,
