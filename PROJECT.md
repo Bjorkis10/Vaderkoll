@@ -172,6 +172,9 @@ Appen går att lägga på hemskärmen ("Lägg till på hemskärmen" i Safari, "I
 - **Mobiltabell:** under 600 px ligger Samlat/Enighet under klockslaget (`.tsum`), kolumnen `.sumc` döljs, ✓/~/✕ ligger i hörnet.
 - **Mörkt läge:** `@media (prefers-color-scheme:dark)` sist i CSS byter variabler och de hårdkodade ljusa ytorna (inkl. SVG-grafer och himlar i Väder).
   Ljust läge är oförändrat. Ny hårdkodad färg i CSS/SVG? Lägg till en mörk motsvarighet där.
+  Princip (omgjord samma dag): neutral nästan-svart bas, kort ett steg ljusare, `--line` i stället för de mörkgröna ramarna
+  (som annars blev vita), dämpad grön accent `--acc`/`--accbg` för valda knappar/dag/timme, mörka timmar nästan osynliga,
+  tabellceller med svag ton där ✓ ~ ✕ bär färgen.
 - **Småfix:** "Uppdaterad hh:mm" (äldsta källans hämttid) bredvid ↻; Väder skriver vilken källa som saknar timmen ("SMHI saknar timmen").
 - **Testat:** i inbyggd webbläsare mot riktiga API:er, 375 px och dator, ljust och mörkt, gamla sparade inställningar (golf utan minLen),
   kryssrutor och minLen per läge, starttidsformuläret, inga konsolfel, ingen sidledsscroll. Inte testat: riktig telefon, delningsmenyn på mobil, skärmläsare.

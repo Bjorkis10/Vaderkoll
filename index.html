@@ -7,7 +7,7 @@
 <!-- PWA: installera på hemskärmen (manifest + sw.js + ikoner ligger bredvid index.html) -->
 <link rel="manifest" href="manifest.webmanifest">
 <meta name="theme-color" content="#f1f5ef" media="(prefers-color-scheme: light)">
-<meta name="theme-color" content="#0f1b17" media="(prefers-color-scheme: dark)">
+<meta name="theme-color" content="#0c1210" media="(prefers-color-scheme: dark)">
 <meta name="color-scheme" content="light dark">
 <link rel="icon" type="image/png" sizes="192x192" href="icon-192.png">
 <link rel="apple-touch-icon" href="apple-touch-icon.png">
@@ -324,20 +324,40 @@
   /* ===== Mörkt läge (följer telefonens/datorns inställning) =====
      Ljust läge är oförändrat; här byts färgvariablerna och de få hårdkodade ljusa ytorna. */
   @media (prefers-color-scheme:dark){
-    :root{--ink:#e2ebe5;--paper:#0f1b17;--sheet:#16251f;--rule:#2e4339;--mute:#9db2a8;--good:#46a862;--ok:#e2b236;--bad:#d4675b;--sea:#6aaed6;color-scheme:dark}
-    .icon:hover,.btn:hover,.res button:hover,.chip:hover,.chip.plus:hover{background:#21352d}
-    .btn.pri:hover{background:#c9d6cf}
-    .drow:hover,.hi:hover,.wr:hover{background:#1c2f28}
-    .drow.sel,tr.selr td,.hi[aria-pressed="true"],.wr[aria-pressed="true"]{background:#223a31}
-    .h,.bar,.trk{background:#26382f}
-    .h.r0{background:#22342c}.h.r1{background:#2f5872}.h.r2{background:#4a88ad}.h.r3{background:#6aaed6}
-    .h.s0{background:#3f9a5a}
-    .h.s1{background:#d6a52c radial-gradient(circle,rgba(10,20,16,.6) 1.1px,transparent 1.4px) 0 0/6px 6px}
-    .h.s2{background:#b54d42 repeating-linear-gradient(135deg,transparent 0 4px,rgba(255,255,255,.2) 4px 6px)}
-    .h.dark{background:#0b1310 radial-gradient(circle at 70% 30%,rgba(255,255,255,.45) 1px,transparent 1.6px) 0 0/7px 7px;box-shadow:inset 0 0 0 1px #34483f}
+    /* Neutral nästan-svart bas (lite grön), kort ett tydligt steg ljusare. --line ersätter de mörkgröna ramarna
+       från ljust läge (som annars blir vita), --acc är en dämpad grön för det som är valt. */
+    :root{--ink:#e4ece7;--paper:#0c1210;--sheet:#151e1a;--rule:#26332d;--line:#3e5148;--mute:#97a9a0;
+      --good:#3f9259;--ok:#d0a536;--bad:#b9564b;--sea:#6aaed6;--acc:#79c08f;--accbg:#24432f;--hov:#1b2621;color-scheme:dark}
+    .icon:hover,.btn:hover,.res button:hover,.chip:hover,.chip.plus:hover{background:var(--hov)}
+    .chip,.btn,.views{border-color:var(--line)}
+    .chip.plus{border-color:var(--line)}
+    .chip.on,.views button[aria-selected="true"],.btn.pri{background:var(--accbg);color:#eef6f1;box-shadow:inset 0 0 0 1px #3f7352}
+    .chip.on{border-color:#3f7352}
+    .btn.pri:hover{background:#2c5139}
+    .hero{border-top:2px solid var(--line)}
+    .sc{border-color:var(--line)}
+    .drow.head,th{border-bottom-color:var(--line)}
+    .drow:hover,.hi:hover,.wr:hover{background:var(--hov)}
+    .drow.sel{background:#18241f;box-shadow:inset 3px 0 0 var(--acc)}
+    tr.selr td{background:#18241f;box-shadow:inset 0 1px 0 var(--line),inset 0 -1px 0 var(--line)}
+    tr.selr td:first-child{box-shadow:inset 3px 0 0 var(--acc),inset 0 1px 0 var(--line),inset 0 -1px 0 var(--line)}
+    .hi[aria-pressed="true"],.wr[aria-pressed="true"]{background:#18241f;border-color:var(--acc)}
+    .wr{box-shadow:0 1px 0 var(--rule)}
+    .h,.bar,.trk{background:#222d28}
+    .h.r0{background:#1d2723}.h.r1{background:#2b5068}.h.r2{background:#43809f}.h.r3{background:#6aaed6}
+    .h.s0{background:var(--good)}
+    .h.s1{background:var(--ok) radial-gradient(circle,rgba(10,18,14,.55) 1.1px,transparent 1.4px) 0 0/6px 6px}
+    .h.s2{background:var(--bad) repeating-linear-gradient(135deg,transparent 0 4px,rgba(255,255,255,.14) 4px 6px)}
+    .h.dark{background:#19221e radial-gradient(circle at 70% 30%,rgba(255,255,255,.2) .8px,transparent 1.4px) 0 0/7px 7px;box-shadow:none}   /* mörkt: tyst, nästan som bakgrunden */
     .h.na{background:transparent}
-    .h.best{box-shadow:inset 0 2px 0 rgba(226,235,229,.85)}
-    td.src0{background:#173826}td.src1{background:#3a3214}td.src2{background:#3d1f1b}
+    .h.best{border-bottom-color:var(--acc);box-shadow:inset 0 2px 0 rgba(121,192,143,.7)}
+    .drow:not(.head) .h:hover{box-shadow:0 2px 6px rgba(0,0,0,.5)}
+    /* Tabellen: svag ton i cellen, färgen bärs av ✓ ~ ✕ i hörnet i stället för hela ytan */
+    td.src0{background:rgba(63,146,89,.07)}td.src1{background:rgba(208,165,54,.09)}td.src2{background:rgba(185,86,75,.1)}
+    td.src0 .mk{color:#6fc48a}td.src1 .mk{color:#e6c15a}td.src2 .mk{color:#e88a7e}
+    .wr:not([aria-pressed="true"]){box-shadow:none;background:linear-gradient(var(--rule),var(--rule)) center bottom/calc(100% - 16px) 1px no-repeat}
+    .wr:not([aria-pressed="true"]):hover{background-color:var(--hov)}
+    .dchart{border-color:var(--rule)}
     .badge{background:#4a3115;color:#ffd39a}
     .badge.ok{background:#1d3d2a;color:#9fe0b4}
     .badge.why{background:#45201c;color:#f3b3aa}
