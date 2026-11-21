@@ -11,7 +11,7 @@ Cykling, Grillning, egna lägen). Standardplats: **Ljungbyhed GK** (ungefärlig 
 - Enighet: orange ram + etikett när källorna är oense om nederbörd (`regn 1/3`, `snö 2/3`, `snöbl. 2/3`), temp (≥3 °C spridning), vind (≥3 m/s) eller moln (≥50 %).
 - Aktivitetslägen med justerbara gränsvärden (temp min/max, regn, vind, byvind, moln, gul marginal %); egna lägen kan skapas/tas bort.
   Läge "Ingen" = rå prognos.
-- Tidsfilter (standard 07–19) och "bästa fönster" per dag (längsta gröna, annars gröna/gula, minst N timmar).
+- Tidsfilter (standard 07–19) och "bästa fönster" per dag (längsta gröna, annars gröna/gula, minst N timmar; N per aktivitet).
 - Förklaring av nekade timmar (`kallt`, `nederbörd`, `snö`, `vind`, `byvind`, `moln`) både i tabellens *Samlat*-kolumn, som tooltip på scorekortets timrutor och som sammanfattning med snabbförslag (t.ex. *Prova Vintergolf →* eller kortare fönster) när inget fönster hittas.
 - Inline-SVG dagsgraf (`dayChartHtml`) som visar källornas temperaturkurvor (SMHI heldragen, Yr streckad, DMI prickad), spridningsband, aktivitetsgräns och nederbördsstaplar.
 - Cache 30 min i localStorage; vid fel visas gammal cache (status `stale`). Källa som är nere kraschar inte appen.
@@ -49,6 +49,12 @@ nederbörd fördelas jämnt över intervallet, `coarse:true` visas kursivt i UI.
   (`max(|gräns|·tol%, golv)`; golv: temp 2 °C, regn 0,2 mm, vind 1,5 m/s, byvind 2 m/s, moln 10 %), röd = mer.
 - Samlat: snitt över källorna (<0,5 grön, <1,25 gul, annars röd).
 - Dag: andel gröna (gul = ½) i tidsfönstret: ≥80 % grön, ≥50 % gul, annars röd.
+- **Mörker (2026-11-21):** lägen med `daylight` (Golf, Vintergolf, Cykling) ger timmar vars mitt ligger före soluppgång eller efter
+  solnedgång (`isNight`, beräknade soltider) samlad poäng `null` + `r.dark` (grå ruta). De bryter därmed bästa fönstret.
+  `judge`/`consensus`/`bestWindow` är oförändrade; vädrets poäng finns kvar i `r.wc`. En timme som slutar strax efter
+  solnedgång (t.ex. 15–16 vid sol ned 15:50) räknas alltså som ljus.
+- **Fönsterlängd per läge:** `minLen` ligger i varje läge (Golf/Vintergolf 4 h ≈ 18 hål, Promenad 1, Cykling 2, Grillning 3).
+  Sparade lägen från äldre versioner saknar fältet → `modeOpt()` faller tillbaka på förinställningen (det gamla gemensamma `minLen` ignoreras).
 
 ## Kända begränsningar / att göra
 - DMI-parametrarna och svarsformatet är verifierade live, men appen har inte körts i en riktig webbläsare med UI över längre tid (logiken är testad i Node med mockad och riktig data).
@@ -150,3 +156,22 @@ Appen går att lägga på hemskärmen ("Lägg till på hemskärmen" i Safari, "I
 - SW registreras bara över https/localhost; `file://` fungerar som tidigare utan SW.
 - Testat: Chrome (inbyggd webbläsare) via `python -m http.server` – SW aktiv, alla filer i cache, sidan laddas med servern nere, inga konsolfel.
   Inte testat: installation på riktig iPhone/Android.
+
+
+## Golfförbättringar och UI (2026-11-21)
+Återställningspunkt före dessa ändringar: git-taggen `fore-forbattringar` (commit 50e5fd1).
+- **Dagsljus / fönsterlängd:** se Poängmodell. Kryssrutorna "Bara när det är ljust" och "Varna för frost på morgonen" finns i lägeseditorn.
+  Dagraden visar "ljust 07:55–15:50" i dagsljuslägen.
+- **Frost (`frostRisk`):** lägsta samlade temperatur kl 00–09. Risk vid ≤ 0 °C, eller ≤ 2 °C med < 30 % moln (markfrost).
+  Visas på dagraden och i heron om bästa fönstret börjar före 11. Bygger på temperatur och molnighet – rör inte regn/snö-logiken. Tumregel; banan avgör.
+- **Kolla en starttid (`renderTee`):** dag + klockslag + längd (1–5 h, 2 h = 9 hål, 4 h = 18 hål). Omdöme = sämsta timmens väderpoäng
+  (`r.wc`) i rundan, orsaker grupperas (`kl 13–17: kallt`), mörker räknas på minuten mot soltiderna (> 15 min före/efter = passar inte).
+  Formuläret ligger i HTML (`#teePanel`) så att fokus inte tappas vid omritning. Tid och längd sparas (`tee` i `sv1:settings`).
+- **Dela (`shareText`):** `navigator.share` (telefonens delningsmeny), annars urklipp. Text + appens adress, inga personuppgifter.
+- **Säsong:** nya användare (inga sparade inställningar) startar i Vintergolf nov–mar, annars Golf. Befintliga behåller sitt val.
+- **Mobiltabell:** under 600 px ligger Samlat/Enighet under klockslaget (`.tsum`), kolumnen `.sumc` döljs, ✓/~/✕ ligger i hörnet.
+- **Mörkt läge:** `@media (prefers-color-scheme:dark)` sist i CSS byter variabler och de hårdkodade ljusa ytorna (inkl. SVG-grafer och himlar i Väder).
+  Ljust läge är oförändrat. Ny hårdkodad färg i CSS/SVG? Lägg till en mörk motsvarighet där.
+- **Småfix:** "Uppdaterad hh:mm" (äldsta källans hämttid) bredvid ↻; Väder skriver vilken källa som saknar timmen ("SMHI saknar timmen").
+- **Testat:** i inbyggd webbläsare mot riktiga API:er, 375 px och dator, ljust och mörkt, gamla sparade inställningar (golf utan minLen),
+  kryssrutor och minLen per läge, starttidsformuläret, inga konsolfel, ingen sidledsscroll. Inte testat: riktig telefon, delningsmenyn på mobil, skärmläsare.
