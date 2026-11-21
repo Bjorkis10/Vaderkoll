@@ -1,0 +1,16 @@
+{
+  "name": "Väderkoll – jämför prognoser",
+  "short_name": "Väderkoll",
+  "description": "SMHI, Yr och DMI sida vid sida – när passar det för golf?",
+  "lang": "sv",
+  "start_url": "./",
+  "scope": "./",
+  "display": "standalone",
+  "background_color": "#f1f5ef",
+  "theme_color": "#f1f5ef",
+  "icons": [
+    { "src": "icon-192.png", "sizes": "192x192", "type": "image/png", "purpose": "any" },
+    { "src": "icon-512.png", "sizes": "512x512", "type": "image/png", "purpose": "any" },
+    { "src": "icon-512.png", "sizes": "512x512", "type": "image/png", "purpose": "maskable" }
+  ]
+}

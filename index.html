@@ -4,6 +4,15 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>Väderkoll – jämför prognoser</title>
+<!-- PWA: installera på hemskärmen (manifest + sw.js + ikoner ligger bredvid index.html) -->
+<link rel="manifest" href="manifest.webmanifest">
+<meta name="theme-color" content="#f1f5ef">
+<link rel="icon" type="image/png" sizes="192x192" href="icon-192.png">
+<link rel="apple-touch-icon" href="apple-touch-icon.png">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-title" content="Väderkoll">
+<meta name="apple-mobile-web-app-status-bar-style" content="default">
 <style>
   /* Färger: gran (ink), grönaktigt papper, status = gräs / raps / tegel */
   :root{
@@ -1441,6 +1450,26 @@ function fillSelects() {
 
 fillSelects();
 load(false);
+
+// PWA: en installerad app ligger ofta kvar öppen i bakgrunden i dagar. När den visas igen (eller nätet kommer
+// tillbaka) hämtas bara källor vars cache har gått ut – färsk cache ger inga nya anrop. Högst en gång per minut.
+let lastWake = Date.now();
+function wake() {
+  if (Date.now() - lastWake < 60e3) { render(); return; }
+  lastWake = Date.now();
+  const old = Object.keys(SOURCES).some((id) => {
+    const s = state.src[id] || {};
+    if (s.status === 'loading') return false;
+    return s.status !== 'ok' || Date.now() - s.ts > (SOURCES[id].cacheMin || CONFIG.CACHE_MIN) * 60e3;
+  });
+  if (old) load(false); else render();   // render ändå: "nu" och idag kan ha flyttat sig
+}
+document.addEventListener('visibilitychange', () => { if (document.visibilityState === 'visible') wake(); });
+window.addEventListener('online', wake);
+// Service worker (bara över https/localhost – file:// stöds inte och ska inte ge fel)
+if ('serviceWorker' in navigator && /^(https:|http:\/\/(localhost|127\.0\.0\.1))/.test(location.href)) {
+  navigator.serviceWorker.register('sw.js').catch(() => {});
+}
 // Hooks för test/felsökning i konsolen
 window.SV = { load, state, parseDmi, buildHourly, judge, consensus, agreement, bestWindow, SOURCES, CONFIG, buildDays, dayAvg, combine, describe, sunTimes, windChill, setView, render };
 </script>

@@ -60,8 +60,8 @@ nederbörd fördelas jämnt över intervallet, `coarse:true` visas kursivt i UI.
 - Prognoser jämförs inte mot observationer; poängen är en tumregel, inte en garanti.
 - Tidszon är fast Europe/Stockholm; sommartid hanteras av `Intl`.
 - Stickprov mot källornas egna webbsidor (yr.no, smhi.se) gjordes inte visuellt – jämförelsen gjordes mot källornas rå-API-svar.
-- Ingen automatisk uppdatering i bakgrunden; tryck "Uppdatera" (cachen är 30 min).
-- Idéer: byvind-tröskel i golfläget, UV, PWA/offline.
+- Ingen uppdatering medan appen är dold. När den visas igen hämtas källor vars cache gått ut (se PWA nedan); annars tryck ↻.
+- Idéer: byvind-tröskel i golfläget, UV.
 - Väder-vyn är testad i Node (mockade källor) och i Chrome via Playwright med mockade svar och fast klocka, inte mot live-API i en riktig användarwebbläsare. Skärmläsare/tangentbord är kodat (aria-pressed, tablist, fokusåterställning) men inte provat med skärmläsare.
 
 
@@ -136,3 +136,17 @@ Inline-SVG (inga bilder, ikonbibliotek eller emoji). Rör aldrig Planera (poäng
 
 ### DMI och 429 (2026-11-19)
 DMI:s öppna API svarar intermittent 429 "Server is busy" (mätt: ~1 av 4 anrop, även med en parameter och >5 s mellanrum). Åtgärder: 90 min cache (`cacheMin`), ↻ hämtar inte om DMI inom 10 min (`minForceMin`), 3 försök med växande paus, bakgrundsförsök varje minut (`retrySoon`, max 5), annars visas senaste data med texten "servern är upptagen (429), försöker igen". Vindriktning begärs inte från DMI.
+
+
+## PWA (installerbar app, tillagt 2026-11-21)
+Appen går att lägga på hemskärmen ("Lägg till på hemskärmen" i Safari, "Installera app" i Chrome/Edge) och öppnas då i eget fönster.
+- Filer bredvid `index.html`: `manifest.webmanifest`, `sw.js`, `icon-192.png`, `icon-512.png` (även maskable), `apple-touch-icon.png` (180 px, iOS).
+  Ikonen (flagga på green med sol) är ritad med ett litet PIL-skript och ligger som färdiga PNG:er.
+- `sw.js` cachar **bara appens egna filer**, nätet först (max 4 s väntan, sedan cache). Prognos-API:erna (andra domäner) passerar orörda;
+  deras data cachas som förut i localStorage. Utan nät visas alltså appen + senast hämtade prognos (status `stale`).
+- Ändras listan med filer i `sw.js`: byt `VERSION` (t.ex. `vk-v2`). Ändringar i `index.html` kräver ingen versionsbump – nätet först ger alltid senaste.
+- `wake()` i slutet av scriptet: när appen visas igen (`visibilitychange`) eller nätet kommer tillbaka (`online`) hämtas bara källor
+  vars cache gått ut, högst en gång per minut. Annars bara omritning (så "idag" och nu-markeringen stämmer).
+- SW registreras bara över https/localhost; `file://` fungerar som tidigare utan SW.
+- Testat: Chrome (inbyggd webbläsare) via `python -m http.server` – SW aktiv, alla filer i cache, sidan laddas med servern nere, inga konsolfel.
+  Inte testat: installation på riktig iPhone/Android.

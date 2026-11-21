@@ -7,6 +7,7 @@ Enfils-väderapp (`index.html`, vanilla JS, inga beroenden, inget bygge) på sve
 SMHI, MET Norway (Yr) och DMI och planera aktiviteter (golf m.m.) i Skåne. Standardplats: Ljungbyhed GK.
 
 ## Regler
+- PWA-filerna (`manifest.webmanifest`, `sw.js`, ikoner) är undantaget från "en fil" – se PROJECT.md "PWA". Byt `VERSION` i `sw.js` om filistan ändras.
 - **Håll det enkelt:** en HTML-fil, kommenterad kod, inga ramverk, inga byggsteg.
 - Språk i UI och kommentarer: svenska.
 - Alla källor normaliseras till samma råformat (se `SOURCES` i koden) och sedan till timrader (`buildHourly`).
